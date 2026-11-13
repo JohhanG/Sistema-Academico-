@@ -1,7 +1,7 @@
 package com.sistema;
 
 import com.sistema.controlador.EstudianteController;
-import com.sistema.modelo.EstudianteDAO;
+import com.sistema.modelo.EstudianteDao;
 import com.sistema.vista.EstudianteView;
 
 import javax.swing.SwingUtilities;
@@ -22,7 +22,7 @@ public class Main {
             }
 
             // Instanciación de componentes MVC
-            EstudianteDAO modelo = new EstudianteDAO();
+            EstudianteDao modelo = new EstudianteDao();
             EstudianteView vista = new EstudianteView();
             EstudianteController controlador = new EstudianteController(vista, modelo);
 

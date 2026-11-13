@@ -1,7 +1,7 @@
 package com.sistema.controlador;
 
 import com.sistema.modelo.Estudiante;
-import com.sistema.modelo.EstudianteDAO;
+import com.sistema.modelo.EstudianteDao;
 import com.sistema.vista.EstudianteView;
 
 import javax.swing.event.ListSelectionEvent;
@@ -10,33 +10,54 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
- * Controlador para la gestión de Estudiantes en el patrón MVC.
- * Gestiona los eventos de la vista y coordina las operaciones con el modelo (DAO).
+ * Controlador para la entidad Estudiante.
+ * Orquesta la lógica de negocio, validaciones y la persistencia (DAO),
+ * además de gestionar los eventos de la vista gráfica cuando está presente.
  */
 public class EstudianteController implements ActionListener {
 
-    private final EstudianteView vista;
-    private final EstudianteDAO modelo;
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
-    public EstudianteController(EstudianteView vista, EstudianteDAO modelo) {
+    private final EstudianteDao estudianteDao;
+    private EstudianteView vista;
+
+    // Constructor sin vista (solo lógica de negocio / servicios)
+    public EstudianteController() {
+        this.estudianteDao = new EstudianteDao();
+    }
+
+    public EstudianteController(EstudianteDao estudianteDao) {
+        if (estudianteDao == null) {
+            throw new IllegalArgumentException("El DAO de estudiante no puede ser nulo.");
+        }
+        this.estudianteDao = estudianteDao;
+    }
+
+    // Constructor completo con Vista (para GUI Swing)
+    public EstudianteController(EstudianteView vista, EstudianteDao estudianteDao) {
+        this(estudianteDao);
         this.vista = vista;
-        this.modelo = modelo;
         inicializarEventos();
     }
 
-    /**
-     * Asocia los oyentes (listeners) a los componentes de la vista.
-     */
+    // =========================================================================
+    // MÉTODOS DE LA VISTA (INTERFAZ GRÁFICA SWING)
+    // =========================================================================
+
     private void inicializarEventos() {
+        if (this.vista == null) return;
+
         this.vista.getBtnGuardar().addActionListener(this);
         this.vista.getBtnActualizar().addActionListener(this);
         this.vista.getBtnEliminar().addActionListener(this);
         this.vista.getBtnLimpiar().addActionListener(this);
         this.vista.getBtnRefrescar().addActionListener(this);
 
-        // Evento de selección en la tabla
         this.vista.getTblEstudiantes().getSelectionModel().addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {
@@ -47,40 +68,38 @@ public class EstudianteController implements ActionListener {
         });
     }
 
-    /**
-     * Inicializa la vista y carga los datos desde la base de datos.
-     */
     public void iniciar() {
-        listarEstudiantes();
-        vista.setVisible(true);
+        if (this.vista != null) {
+            listarEstudiantesEnTabla();
+            vista.setVisible(true);
+        }
     }
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (vista == null) return;
         Object source = e.getSource();
 
         if (source == vista.getBtnGuardar()) {
-            registrarEstudiante();
+            ejecutarRegistroDesdeVista();
         } else if (source == vista.getBtnActualizar()) {
-            actualizarEstudiante();
+            ejecutarActualizacionDesdeVista();
         } else if (source == vista.getBtnEliminar()) {
-            eliminarEstudiante();
+            ejecutarEliminacionDesdeVista();
         } else if (source == vista.getBtnLimpiar()) {
             vista.limpiarFormulario();
         } else if (source == vista.getBtnRefrescar()) {
-            listarEstudiantes();
+            listarEstudiantesEnTabla();
             vista.mostrarMensaje("Lista de estudiantes actualizada correctamente.");
         }
     }
 
-    /**
-     * Carga todos los estudiantes en la tabla de la vista.
-     */
-    public void listarEstudiantes() {
+    public void listarEstudiantesEnTabla() {
+        if (vista == null) return;
         DefaultTableModel modelTabla = vista.getModeloTabla();
-        modelTabla.setRowCount(0); // Limpiar filas previas
+        modelTabla.setRowCount(0);
 
-        List<Estudiante> lista = modelo.listar();
+        List<Estudiante> lista = obtenerTodosLosEstudiantes();
         for (Estudiante est : lista) {
             Object[] fila = {
                     est.getIdEstudiante(),
@@ -92,34 +111,24 @@ public class EstudianteController implements ActionListener {
         }
     }
 
-    /**
-     * Registra un nuevo estudiante a partir de los datos ingresados.
-     */
-    private void registrarEstudiante() {
+    private void ejecutarRegistroDesdeVista() {
         String nombre = vista.getTxtNombre().getText().trim();
         String apellido = vista.getTxtApellido().getText().trim();
         String email = vista.getTxtEmail().getText().trim();
 
-        if (!validarCampos(nombre, apellido, email)) {
-            return;
-        }
-
-        Estudiante nuevoEstudiante = new Estudiante(nombre, apellido, email);
-        boolean exito = modelo.insertar(nuevoEstudiante);
-
-        if (exito) {
+        try {
+            registrarEstudiante(nombre, apellido, email);
             vista.mostrarMensaje("✅ Estudiante registrado exitosamente.");
             vista.limpiarFormulario();
-            listarEstudiantes();
-        } else {
-            vista.mostrarError("❌ No se pudo registrar el estudiante. Verifica que el correo no esté duplicado.");
+            listarEstudiantesEnTabla();
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
+        } catch (Exception ex) {
+            vista.mostrarError("❌ Error al registrar estudiante: " + ex.getMessage());
         }
     }
 
-    /**
-     * Actualiza la información del estudiante actualmente seleccionado.
-     */
-    private void actualizarEstudiante() {
+    private void ejecutarActualizacionDesdeVista() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
             vista.mostrarError("Por favor selecciona un estudiante de la tabla para actualizar.");
@@ -130,31 +139,22 @@ public class EstudianteController implements ActionListener {
         String apellido = vista.getTxtApellido().getText().trim();
         String email = vista.getTxtEmail().getText().trim();
 
-        if (!validarCampos(nombre, apellido, email)) {
-            return;
-        }
-
         try {
             int id = Integer.parseInt(idStr);
-            Estudiante estudiante = new Estudiante(id, nombre, apellido, email);
-            boolean exito = modelo.actualizar(estudiante);
-
-            if (exito) {
-                vista.mostrarMensaje("✅ Estudiante actualizado exitosamente.");
-                vista.limpiarFormulario();
-                listarEstudiantes();
-            } else {
-                vista.mostrarError("❌ No se pudo actualizar el estudiante.");
-            }
+            actualizarEstudiante(id, nombre, apellido, email);
+            vista.mostrarMensaje("✅ Estudiante actualizado exitosamente.");
+            vista.limpiarFormulario();
+            listarEstudiantesEnTabla();
         } catch (NumberFormatException ex) {
             vista.mostrarError("ID de estudiante inválido.");
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
+        } catch (Exception ex) {
+            vista.mostrarError("❌ Error al actualizar estudiante: " + ex.getMessage());
         }
     }
 
-    /**
-     * Elimina el estudiante seleccionado tras confirmar con el usuario.
-     */
-    private void eliminarEstudiante() {
+    private void ejecutarEliminacionDesdeVista() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
             vista.mostrarError("Por favor selecciona un estudiante de la tabla para eliminar.");
@@ -165,24 +165,20 @@ public class EstudianteController implements ActionListener {
             int id = Integer.parseInt(idStr);
             boolean confirmar = vista.confirmarAccion("¿Estás seguro de eliminar el estudiante con ID " + id + "?");
             if (confirmar) {
-                boolean exito = modelo.eliminar(id);
-                if (exito) {
-                    vista.mostrarMensaje("✅ Estudiante eliminado exitosamente.");
-                    vista.limpiarFormulario();
-                    listarEstudiantes();
-                } else {
-                    vista.mostrarError("❌ No se pudo eliminar el estudiante. Puede tener inscripciones asociadas.");
-                }
+                eliminarEstudiante(id);
+                vista.mostrarMensaje("✅ Estudiante eliminado exitosamente.");
+                vista.limpiarFormulario();
+                listarEstudiantesEnTabla();
             }
         } catch (NumberFormatException ex) {
             vista.mostrarError("ID de estudiante inválido.");
+        } catch (Exception ex) {
+            vista.mostrarError("❌ Error al eliminar estudiante: " + ex.getMessage());
         }
     }
 
-    /**
-     * Llena los campos del formulario con el estudiante seleccionado de la tabla.
-     */
     private void cargarEstudianteSeleccionado() {
+        if (vista == null) return;
         int fila = vista.getTblEstudiantes().getSelectedRow();
         if (fila >= 0) {
             vista.getTxtId().setText(vista.getModeloTabla().getValueAt(fila, 0).toString());
@@ -192,21 +188,107 @@ public class EstudianteController implements ActionListener {
         }
     }
 
-    /**
-     * Valida que los campos no estén vacíos y tengan un formato coherente.
-     */
-    private boolean validarCampos(String nombre, String apellido, String email) {
-        if (nombre.isEmpty() || apellido.isEmpty() || email.isEmpty()) {
-            vista.mostrarError("Todos los campos (Nombre, Apellido, Correo) son obligatorios.");
-            return false;
+    // =========================================================================
+    // LÓGICA DE NEGOCIO Y PERSISTENCIA (SANTIAGO)
+    // =========================================================================
+
+    public Estudiante registrarEstudiante(String nombre, String apellido, String email) {
+        Estudiante estudiante = new Estudiante(
+                nombre != null ? nombre.trim() : null,
+                apellido != null ? apellido.trim() : null,
+                email != null ? email.trim() : null
+        );
+        registrarEstudiante(estudiante);
+        return estudiante;
+    }
+
+    public void registrarEstudiante(Estudiante estudiante) {
+        validarEstudiante(estudiante);
+
+        Optional<Estudiante> existente = estudianteDao.buscarPorEmail(estudiante.getEmail());
+        if (existente.isPresent()) {
+            throw new IllegalArgumentException("Ya existe un estudiante registrado con el email: " + estudiante.getEmail());
         }
 
-        if (!email.matches("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$")) {
-            vista.mostrarError("El formato del correo electrónico no es válido.");
-            return false;
+        estudianteDao.guardar(estudiante);
+    }
+
+    public List<Estudiante> obtenerTodosLosEstudiantes() {
+        return estudianteDao.obtenerTodos();
+    }
+
+    public Optional<Estudiante> buscarEstudiantePorId(int id) {
+        if (id <= 0) {
+            throw new IllegalArgumentException("El ID del estudiante debe ser mayor a cero.");
+        }
+        return estudianteDao.buscarPorId(id);
+    }
+
+    public Optional<Estudiante> buscarEstudiantePorEmail(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("El email de búsqueda no puede estar vacío.");
+        }
+        return estudianteDao.buscarPorEmail(email.trim());
+    }
+
+    public void actualizarEstudiante(int id, String nombre, String apellido, String email) {
+        Estudiante estudiante = new Estudiante(
+                id,
+                nombre != null ? nombre.trim() : null,
+                apellido != null ? apellido.trim() : null,
+                email != null ? email.trim() : null
+        );
+        actualizarEstudiante(estudiante);
+    }
+
+    public void actualizarEstudiante(Estudiante estudiante) {
+        if (estudiante == null || estudiante.getIdEstudiante() <= 0) {
+            throw new IllegalArgumentException("El estudiante o su ID es inválido para actualizar.");
         }
 
-        return true;
+        validarEstudiante(estudiante);
+
+        Optional<Estudiante> existente = estudianteDao.buscarPorId(estudiante.getIdEstudiante());
+        if (existente.isEmpty()) {
+            throw new IllegalArgumentException("No se encontró el estudiante con ID: " + estudiante.getIdEstudiante());
+        }
+
+        Optional<Estudiante> porEmail = estudianteDao.buscarPorEmail(estudiante.getEmail());
+        if (porEmail.isPresent() && porEmail.get().getIdEstudiante() != estudiante.getIdEstudiante()) {
+            throw new IllegalArgumentException("El email ya está en uso por otro estudiante: " + estudiante.getEmail());
+        }
+
+        estudianteDao.actualizar(estudiante);
+    }
+
+    public void eliminarEstudiante(int id) {
+        if (id <= 0) {
+            throw new IllegalArgumentException("El ID del estudiante debe ser mayor a cero.");
+        }
+
+        Optional<Estudiante> existente = estudianteDao.buscarPorId(id);
+        if (existente.isEmpty()) {
+            throw new IllegalArgumentException("No se encontró el estudiante con ID: " + id);
+        }
+
+        estudianteDao.eliminar(id);
+    }
+
+    private void validarEstudiante(Estudiante estudiante) {
+        if (estudiante == null) {
+            throw new IllegalArgumentException("El estudiante no puede ser nulo.");
+        }
+        if (estudiante.getNombre() == null || estudiante.getNombre().trim().isEmpty()) {
+            throw new IllegalArgumentException("El nombre del estudiante es obligatorio.");
+        }
+        if (estudiante.getApellido() == null || estudiante.getApellido().trim().isEmpty()) {
+            throw new IllegalArgumentException("El apellido del estudiante es obligatorio.");
+        }
+        if (estudiante.getEmail() == null || estudiante.getEmail().trim().isEmpty()) {
+            throw new IllegalArgumentException("El email del estudiante es obligatorio.");
+        }
+        if (!EMAIL_PATTERN.matcher(estudiante.getEmail().trim()).matches()) {
+            throw new IllegalArgumentException("El formato del email no es válido.");
+        }
     }
 }
-

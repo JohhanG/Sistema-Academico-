@@ -1,8 +1,10 @@
 package com.sistema.modelo;
 
+import java.util.Objects;
+
 /**
- * Representa la entidad Estudiante del Sistema Académico.
- * Mapea la tabla 'estudiante' de la base de datos PostgreSQL en Supabase.
+ * Entidad que representa a un Estudiante en el sistema académico.
+ * Corresponde a la tabla 'estudiante' en la base de datos PostgreSQL (Supabase).
  */
 public class Estudiante {
 
@@ -11,18 +13,15 @@ public class Estudiante {
     private String apellido;
     private String email;
 
-    // Constructor vacío
     public Estudiante() {
     }
 
-    // Constructor sin ID (usado para inserciones donde el ID es SERIAL / autoincremental)
     public Estudiante(String nombre, String apellido, String email) {
         this.nombre = nombre;
         this.apellido = apellido;
         this.email = email;
     }
 
-    // Constructor completo
     public Estudiante(int idEstudiante, String nombre, String apellido, String email) {
         this.idEstudiante = idEstudiante;
         this.nombre = nombre;
@@ -30,13 +29,20 @@ public class Estudiante {
         this.email = email;
     }
 
-    // Getters y Setters
     public int getIdEstudiante() {
         return idEstudiante;
     }
 
     public void setIdEstudiante(int idEstudiante) {
         this.idEstudiante = idEstudiante;
+    }
+
+    public int getId() {
+        return idEstudiante;
+    }
+
+    public void setId(int id) {
+        this.idEstudiante = id;
     }
 
     public String getNombre() {
@@ -64,6 +70,20 @@ public class Estudiante {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Estudiante that = (Estudiante) o;
+        return idEstudiante == that.idEstudiante &&
+                Objects.equals(email, that.email);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(idEstudiante, email);
+    }
+
+    @Override
     public String toString() {
         return "Estudiante{" +
                 "idEstudiante=" + idEstudiante +
@@ -73,4 +93,3 @@ public class Estudiante {
                 '}';
     }
 }
-
