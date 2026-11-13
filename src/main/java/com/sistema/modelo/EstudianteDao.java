@@ -16,12 +16,17 @@ import java.util.Properties;
 
 /**
  * DAO (Data Access Object) para la entidad Estudiante.
- * Gestiona las operaciones CRUD sobre la tabla 'estudiante' usando JDBC.
+ * Gestiona las operaciones CRUD sobre la tabla 'estudiante' en Supabase (PostgreSQL) usando JDBC.
  * Cumple la regla de arquitectura: sin llamadas a System.out.
  */
 public class EstudianteDao {
 
     private static final String CONFIG_FILE = "config.properties";
+    private static final String DEFAULT_SUPABASE_HOST = "db.qwtdiaeruuxshrmxsaoo.supabase.co";
+    private static final String DEFAULT_JDBC_URL =
+            "jdbc:postgresql://" + DEFAULT_SUPABASE_HOST + ":5432/postgres?sslmode=require";
+    private static final String DEFAULT_USER = "postgres";
+
     private final Connection externalConnection;
 
     public EstudianteDao() {
@@ -33,8 +38,8 @@ public class EstudianteDao {
     }
 
     /**
-     * Obtiene una conexión a la base de datos a partir de la conexión inyectada
-     * o leyendo el archivo config.properties en la raíz del proyecto.
+     * Obtiene una conexión a la base de datos Supabase (PostgreSQL) a partir de la
+     * conexión inyectada o leyendo el archivo config.properties en la raíz del proyecto.
      */
     protected Connection obtenerConexion() throws SQLException {
         if (externalConnection != null && !externalConnection.isClosed()) {
@@ -43,28 +48,47 @@ public class EstudianteDao {
 
         Properties properties = new Properties();
         File archivoConfig = new File(CONFIG_FILE);
-        if (!archivoConfig.exists()) {
-            throw new SQLException("Archivo de configuración no encontrado: " + CONFIG_FILE);
+        if (archivoConfig.exists()) {
+            try (FileInputStream fis = new FileInputStream(archivoConfig)) {
+                properties.load(fis);
+            } catch (IOException e) {
+                throw new SQLException("Error al leer el archivo " + CONFIG_FILE, e);
+            }
         }
 
-        try (FileInputStream fis = new FileInputStream(archivoConfig)) {
-            properties.load(fis);
-        } catch (IOException e) {
-            throw new SQLException("Error al leer el archivo " + CONFIG_FILE, e);
-        }
-
-        String url = properties.getProperty("URL", properties.getProperty("db.url"));
-        String user = properties.getProperty("USER", properties.getProperty("db.user", ""));
-        String password = properties.getProperty("PASSWORD", properties.getProperty("db.password", ""));
-
-        if (url == null || url.isBlank()) {
-            throw new SQLException("La propiedad URL no está definida en " + CONFIG_FILE);
-        }
+        String rawUrl = properties.getProperty("URL",
+                properties.getProperty("db.url", DEFAULT_JDBC_URL)).trim();
+        String url = normalizarUrlJdbc(rawUrl);
+        String user = properties.getProperty("USER",
+                properties.getProperty("db.user", DEFAULT_USER)).trim();
+        String password = properties.getProperty("PASSWORD",
+                properties.getProperty("db.password", "")).trim();
 
         if (user.isEmpty() && password.isEmpty()) {
             return DriverManager.getConnection(url);
         }
         return DriverManager.getConnection(url, user, password);
+    }
+
+    /**
+     * Convierte una URL HTTPS de proyecto Supabase (https://<ref>.supabase.co)
+     * en una URL JDBC de PostgreSQL válida si es necesario.
+     */
+    private String normalizarUrlJdbc(String rawUrl) {
+        if (rawUrl == null || rawUrl.isEmpty()) {
+            return DEFAULT_JDBC_URL;
+        }
+        if (rawUrl.startsWith("jdbc:")) {
+            return rawUrl;
+        }
+        if (rawUrl.startsWith("https://") || rawUrl.startsWith("http://")) {
+            String host = rawUrl.replaceFirst("^https?://", "").replaceAll("/+$", "");
+            if (!host.startsWith("db.") && host.endsWith(".supabase.co")) {
+                host = "db." + host;
+            }
+            return "jdbc:postgresql://" + host + ":5432/postgres?sslmode=require";
+        }
+        return rawUrl;
     }
 
     private void cerrarConexionSiEsPropia(Connection conn) {
