@@ -1,7 +1,7 @@
 
 package com.sistema.modelo;
 
-import com.sistema.config.conexionbd;
+import com.sistema.config.ConexionBD;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -15,7 +15,7 @@ public class GrupoDAO {
 
     public int insertar(Grupo grupo) throws SQLException {
         String sql = "INSERT INTO grupo (id_materia, id_docente, aula, horario) VALUES (?, ?, ?, ?)";
-        try (Connection con = conexionbd.getConexion();
+        try (Connection con = ConexionBD.getConexion();
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, grupo.getIdMateria());
@@ -37,7 +37,7 @@ public class GrupoDAO {
     public List<Grupo> listarTodos() throws SQLException {
         List<Grupo> grupos = new ArrayList<>();
         String sql = "SELECT id_grupo, id_materia, id_docente, aula, horario FROM grupo ORDER BY id_grupo";
-        try (Connection con = conexionbd.getConexion();
+        try (Connection con = ConexionBD.getConexion();
              PreparedStatement ps = con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
@@ -50,7 +50,7 @@ public class GrupoDAO {
 
     public Grupo buscarPorId(int idGrupo) throws SQLException {
         String sql = "SELECT id_grupo, id_materia, id_docente, aula, horario FROM grupo WHERE id_grupo = ?";
-        try (Connection con = conexionbd.getConexion();
+        try (Connection con = ConexionBD.getConexion();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setInt(1, idGrupo);
@@ -65,7 +65,7 @@ public class GrupoDAO {
 
     public boolean actualizar(Grupo grupo) throws SQLException {
         String sql = "UPDATE grupo SET id_materia = ?, id_docente = ?, aula = ?, horario = ? WHERE id_grupo = ?";
-        try (Connection con = conexionbd.getConexion();
+        try (Connection con = ConexionBD.getConexion();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setInt(1, grupo.getIdMateria());
@@ -79,7 +79,7 @@ public class GrupoDAO {
 
     public boolean eliminar(int idGrupo) throws SQLException {
         String sql = "DELETE FROM grupo WHERE id_grupo = ?";
-        try (Connection con = conexionbd.getConexion();
+        try (Connection con = ConexionBD.getConexion();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setInt(1, idGrupo);
