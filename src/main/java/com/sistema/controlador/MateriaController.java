@@ -2,6 +2,7 @@ package com.sistema.controlador;
 
 import com.sistema.modelo.Materia;
 import com.sistema.modelo.MateriaDAO;
+import com.sistema.servicio.MateriaService;
 import com.sistema.vista.MateriaView;
 
 import javax.swing.event.ListSelectionEvent;
@@ -11,18 +12,19 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
 
-/**
- * Controlador para la gestión de Materias en el patrón MVC.
- * Coordina los eventos de la vista con la capa de persistencia (DAO).
- */
+// Controlador que conecta MateriaView con MateriaService
 public class MateriaController implements ActionListener {
 
     private final MateriaView vista;
-    private final MateriaDAO modelo;
+    private final MateriaService servicio;
 
     public MateriaController(MateriaView vista, MateriaDAO modelo) {
+        this(vista, new MateriaService(modelo));
+    }
+
+    public MateriaController(MateriaView vista, MateriaService servicio) {
         this.vista = vista;
-        this.modelo = modelo;
+        this.servicio = servicio;
         inicializarEventos();
     }
 
@@ -62,7 +64,7 @@ public class MateriaController implements ActionListener {
             vista.limpiarFormulario();
         } else if (source == vista.getBtnRefrescar()) {
             listarMaterias();
-            vista.mostrarMensaje("Lista de materias actualizada correctamente.");
+            vista.mostrarMensaje("Lista de materias actualizada.");
         }
     }
 
@@ -70,7 +72,7 @@ public class MateriaController implements ActionListener {
         DefaultTableModel modelTabla = vista.getModeloTabla();
         modelTabla.setRowCount(0);
 
-        List<Materia> lista = modelo.listar();
+        List<Materia> lista = servicio.listarMaterias();
         for (Materia mat : lista) {
             Object[] fila = {
                     mat.getIdMateria(),
@@ -85,75 +87,75 @@ public class MateriaController implements ActionListener {
         String nombre = vista.getTxtNombreMateria().getText().trim();
         int creditos = (int) vista.getSpnCreditos().getValue();
 
-        if (!validarCampos(nombre, creditos)) {
-            return;
-        }
+        try {
+            Materia nuevaMateria = new Materia(nombre, creditos);
+            boolean exito = servicio.registrarMateria(nuevaMateria);
 
-        Materia nuevaMateria = new Materia(nombre, creditos);
-        boolean exito = modelo.insertar(nuevaMateria);
-
-        if (exito) {
-            vista.mostrarMensaje("✅ Materia registrada exitosamente.");
-            vista.limpiarFormulario();
-            listarMaterias();
-        } else {
-            vista.mostrarError("❌ No se pudo registrar la materia en la base de datos.");
+            if (exito) {
+                vista.mostrarMensaje("Materia registrada exitosamente.");
+                vista.limpiarFormulario();
+                listarMaterias();
+            } else {
+                vista.mostrarError("No se pudo registrar la materia.");
+            }
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
         }
     }
 
     private void actualizarMateria() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
-            vista.mostrarError("Por favor selecciona una materia de la tabla para actualizar.");
+            vista.mostrarError("Selecciona una materia de la tabla para actualizar.");
             return;
         }
 
         String nombre = vista.getTxtNombreMateria().getText().trim();
         int creditos = (int) vista.getSpnCreditos().getValue();
 
-        if (!validarCampos(nombre, creditos)) {
-            return;
-        }
-
         try {
             int id = Integer.parseInt(idStr);
             Materia materia = new Materia(id, nombre, creditos);
-            boolean exito = modelo.actualizar(materia);
+            boolean exito = servicio.actualizarMateria(materia);
 
             if (exito) {
-                vista.mostrarMensaje("✅ Materia actualizada exitosamente.");
+                vista.mostrarMensaje("Materia actualizada exitosamente.");
                 vista.limpiarFormulario();
                 listarMaterias();
             } else {
-                vista.mostrarError("❌ No se pudo actualizar la materia.");
+                vista.mostrarError("No se pudo actualizar la materia.");
             }
         } catch (NumberFormatException ex) {
-            vista.mostrarError("ID de materia inválido.");
+            vista.mostrarError("ID de materia invalido.");
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
         }
     }
 
     private void eliminarMateria() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
-            vista.mostrarError("Por favor selecciona una materia de la tabla para eliminar.");
+            vista.mostrarError("Selecciona una materia de la tabla para eliminar.");
             return;
         }
 
         try {
             int id = Integer.parseInt(idStr);
-            boolean confirmar = vista.confirmarAccion("¿Estás seguro de eliminar la materia con ID " + id + "?");
+            boolean confirmar = vista.confirmarAccion("Deseas eliminar la materia con ID " + id + "?");
             if (confirmar) {
-                boolean exito = modelo.eliminar(id);
+                boolean exito = servicio.eliminarMateria(id);
                 if (exito) {
-                    vista.mostrarMensaje("✅ Materia eliminada exitosamente.");
+                    vista.mostrarMensaje("Materia eliminada exitosamente.");
                     vista.limpiarFormulario();
                     listarMaterias();
                 } else {
-                    vista.mostrarError("❌ No se pudo eliminar la materia. Puede tener grupos o cursos asignados.");
+                    vista.mostrarError("No se pudo eliminar la materia.");
                 }
             }
         } catch (NumberFormatException ex) {
-            vista.mostrarError("ID de materia inválido.");
+            vista.mostrarError("ID de materia invalido.");
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
         }
     }
 
@@ -165,19 +167,8 @@ public class MateriaController implements ActionListener {
             try {
                 int creditos = Integer.parseInt(vista.getModeloTabla().getValueAt(fila, 2).toString());
                 vista.getSpnCreditos().setValue(creditos);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
-    }
-
-    private boolean validarCampos(String nombre, int creditos) {
-        if (nombre.isEmpty()) {
-            vista.mostrarError("El nombre de la materia es obligatorio.");
-            return false;
-        }
-        if (creditos <= 0) {
-            vista.mostrarError("Los créditos deben ser mayores a 0.");
-            return false;
-        }
-        return true;
     }
 }

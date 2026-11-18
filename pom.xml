@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
 
     <name>Sistema Académico</name>
-    <description>Sistema Académico con Arquitectura MVC y conexión a Supabase (PostgreSQL)</description>
+    <description>Sistema Académico con Arquitectura MVC + Servicio + DAO y conexión a Supabase (PostgreSQL)</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -37,6 +37,11 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>

@@ -1,6 +1,7 @@
 -- ==========================================================
 -- SISTEMA ACADÉMICO - MODELO DE BASE DE DATOS (SUPABASE / POSTGRESQL)
 -- Basado en el diagrama de clases del profesor
+-- Incluye Procedimientos/Funciones Almacenadas y Contraseñas con Hash SHA-512
 -- ==========================================================
 
 -- 1. Tabla: Materia
@@ -46,7 +47,7 @@ CREATE TABLE IF NOT EXISTS inscripcion_curso (
     CONSTRAINT uq_estudiante_grupo UNIQUE (id_estudiante, id_grupo)
 );
 
--- 6. Tabla: Usuario / Roles (Autenticación y Seguridad)
+-- 6. Tabla: Usuario / Roles (Autenticación y Seguridad con Hash SHA-512 / MD5)
 CREATE TABLE IF NOT EXISTS usuario (
     id_usuario SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -56,6 +57,68 @@ CREATE TABLE IF NOT EXISTS usuario (
     id_docente INT UNIQUE REFERENCES docente(id_docente) ON DELETE CASCADE,
     fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- ==========================================================
+-- PROCEDIMIENTOS / FUNCIONES ALMACENADAS (STORED PROCEDURES)
+-- Para carga de JComboBox / Selects en las Vistas Swing
+-- ==========================================================
+
+-- Procedimiento Almacenado 1: Cargar ComboBox de Estudiantes
+CREATE OR REPLACE FUNCTION sp_combos_estudiantes()
+RETURNS TABLE(id_estudiante INT, descripcion TEXT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT e.id_estudiante,
+           (e.id_estudiante || ' - ' || e.nombre || ' ' || e.apellido)::TEXT AS descripcion
+    FROM estudiante e
+    ORDER BY e.id_estudiante ASC;
+END;
+$$;
+
+-- Procedimiento Almacenado 2: Cargar ComboBox de Grupos con Materia y Aula
+CREATE OR REPLACE FUNCTION sp_combos_grupos()
+RETURNS TABLE(id_grupo INT, descripcion TEXT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT g.id_grupo,
+           (g.id_grupo || ' - ' || m.nombre_materia || ' | Aula: ' || g.aula || ' (' || g.horario || ')')::TEXT AS descripcion
+    FROM grupo g
+    JOIN materia m ON g.id_materia = m.id_materia
+    ORDER BY g.id_grupo ASC;
+END;
+$$;
+
+-- Procedimiento Almacenado 3: Cargar ComboBox de Materias
+CREATE OR REPLACE FUNCTION sp_combos_materias()
+RETURNS TABLE(id_materia INT, descripcion TEXT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT m.id_materia,
+           (m.id_materia || ' - ' || m.nombre_materia || ' (' || m.creditos || ' cr.)')::TEXT AS descripcion
+    FROM materia m
+    ORDER BY m.id_materia ASC;
+END;
+$$;
+
+-- Procedimiento Almacenado 4: Cargar ComboBox de Docentes
+CREATE OR REPLACE FUNCTION sp_combos_docentes()
+RETURNS TABLE(id_docente INT, descripcion TEXT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT d.id_docente,
+           (d.id_docente || ' - ' || d.nombre || ' (' || d.especialidad || ')')::TEXT AS descripcion
+    FROM docente d
+    ORDER BY d.id_docente ASC;
+END;
+$$;
 
 -- ==========================================================
 -- DATOS DE PRUEBA INICIALES (SEMILLAS)
@@ -94,9 +157,12 @@ INSERT INTO inscripcion_curso (id_estudiante, id_grupo, nota_final, estado) VALU
 (3, 2, NULL, 'Matriculado')
 ON CONFLICT (id_estudiante, id_grupo) DO NOTHING;
 
--- Insertar Usuarios / Roles
+-- Insertar Usuarios / Roles (Contraseñas con Hash SHA-512)
+-- admin -> admin123
+-- cgomez -> docente123
+-- johhang -> estudiante123
 INSERT INTO usuario (username, password, rol, id_estudiante, id_docente) VALUES
-('admin', 'admin123', 'ADMIN', NULL, NULL),
-('cgomez', 'docente123', 'DOCENTE', NULL, 1),
-('johhang', 'estudiante123', 'ESTUDIANTE', 1, NULL)
-ON CONFLICT (username) DO NOTHING;
+('admin', '7fcf4ba391c48784edde599889d6e3f1e47a27db36ecc050cc92f259bfac38afad2c68a1ae804d77075e8fb722503f3eca2b2c1006ee6f6c7b7628cb45fffd1d', 'ADMIN', NULL, NULL),
+('cgomez', 'c4f9375f9834b4e7f0a528cc65c055702bfd52242e81b6fd650c7402a5b69a2c5f80a1d84e84c5749d80e088f285e7075fb26a19c530e77e6f56a0e68d801bf1', 'DOCENTE', NULL, 1),
+('johhang', 'a62f2225bf70bfaccbc7f1ef2a397836717377deef90b8e3e9150250908a6f86bc7072009b4c41802f74b2b6a48e589b100ef5928c7b7d517c21b20e9b938f7c', 'ESTUDIANTE', 1, NULL)
+ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password;
