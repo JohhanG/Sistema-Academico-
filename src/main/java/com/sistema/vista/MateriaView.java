@@ -5,26 +5,25 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
-/**
- * Vista gráfica (Swing) para el módulo de Gestión de Materias.
- * Diseñada siguiendo el patrón Modelo-Vista-Controlador (MVC).
- */
+// Vista Swing para la gestion de materias del pensum
 public class MateriaView extends JFrame {
 
-    // Componentes del Formulario
+    private JFrame menuPrincipal;
+
     private JTextField txtId;
     private JTextField txtNombreMateria;
     private JSpinner spnCreditos;
 
-    // Botones de Acción
     private JButton btnGuardar;
     private JButton btnActualizar;
     private JButton btnEliminar;
     private JButton btnLimpiar;
     private JButton btnRefrescar;
+    private JButton btnVolverMenu;
 
-    // Tabla y Modelo
     private JTable tblMaterias;
     private DefaultTableModel modeloTabla;
 
@@ -32,40 +31,59 @@ public class MateriaView extends JFrame {
         initComponents();
     }
 
+    public void setMenuPrincipal(JFrame menuPrincipal) {
+        this.menuPrincipal = menuPrincipal;
+    }
+
     private void initComponents() {
-        setTitle("Sistema Académico - Gestión de Materias");
-        setSize(800, 550);
-        setMinimumSize(new Dimension(700, 480));
+        setTitle("Sistema Academico - Plan de Estudios (Materias)");
+        setSize(850, 580);
+        setMinimumSize(new Dimension(750, 500));
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Panel Principal con margen
-        JPanel panelPrincipal = new JPanel(new BorderLayout(15, 15));
-        panelPrincipal.setBorder(new EmptyBorder(15, 15, 15, 15));
-        panelPrincipal.setBackground(new Color(245, 247, 250));
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                volverAlMenu();
+            }
+        });
 
-        // 1. TÍTULO SUPERIOR
-        JLabel lblTitulo = new JLabel("📚 Gestión de Materias", SwingConstants.CENTER);
-        lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        lblTitulo.setForeground(new Color(33, 37, 41));
-        panelPrincipal.add(lblTitulo, BorderLayout.NORTH);
+        JPanel panelPrincipal = new JPanel(new BorderLayout(12, 12));
+        panelPrincipal.setBorder(new EmptyBorder(12, 15, 12, 15));
+        panelPrincipal.setBackground(Color.WHITE);
 
-        // 2. PANEL IZQUIERDO: FORMULARIO Y BOTONES
+        JPanel panelBanner = new JPanel(new BorderLayout());
+        JPanel barraAzul = new JPanel(new BorderLayout());
+        barraAzul.setBackground(new Color(11, 56, 97));
+        barraAzul.setPreferredSize(new Dimension(0, 36));
+        JLabel lblTitulo = new JLabel("Plan de Estudios - Asignaturas y Creditos", SwingConstants.CENTER);
+        lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblTitulo.setForeground(Color.WHITE);
+        barraAzul.add(lblTitulo, BorderLayout.CENTER);
+
+        JPanel barraAmarilla = new JPanel();
+        barraAmarilla.setBackground(new Color(242, 183, 5));
+        barraAmarilla.setPreferredSize(new Dimension(0, 6));
+
+        panelBanner.add(barraAzul, BorderLayout.CENTER);
+        panelBanner.add(barraAmarilla, BorderLayout.SOUTH);
+        panelPrincipal.add(panelBanner, BorderLayout.NORTH);
+
         JPanel panelIzquierdo = new JPanel(new BorderLayout(10, 10));
         panelIzquierdo.setOpaque(false);
 
-        // Formulario de datos
         JPanel panelFormulario = new JPanel(new GridBagLayout());
         panelFormulario.setBackground(Color.WHITE);
         panelFormulario.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(220, 224, 230), 1),
                 BorderFactory.createTitledBorder(
                         BorderFactory.createEmptyBorder(10, 10, 10, 10),
-                        "Datos de la Materia",
+                        "Datos de la Asignatura",
                         TitledBorder.LEFT,
                         TitledBorder.TOP,
-                        new Font("Segoe UI", Font.BOLD, 14),
-                        new Color(50, 70, 90)
+                        new Font("Segoe UI", Font.BOLD, 13),
+                        new Color(11, 56, 97)
                 )
         ));
 
@@ -74,73 +92,73 @@ public class MateriaView extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
 
-        // Fila 0: ID (Solo lectura)
         gbc.gridx = 0; gbc.gridy = 0;
-        panelFormulario.add(new JLabel("ID Materia:"), gbc);
+        panelFormulario.add(new JLabel("Codigo Materia:"), gbc);
         gbc.gridx = 1;
         txtId = new JTextField(15);
         txtId.setEditable(false);
         txtId.setBackground(new Color(240, 240, 240));
         panelFormulario.add(txtId, gbc);
 
-        // Fila 1: Nombre de la Materia
         gbc.gridx = 0; gbc.gridy = 1;
-        panelFormulario.add(new JLabel("Nombre Materia:"), gbc);
+        panelFormulario.add(new JLabel("Nombre Asignatura:"), gbc);
         gbc.gridx = 1;
         txtNombreMateria = new JTextField(15);
         panelFormulario.add(txtNombreMateria, gbc);
 
-        // Fila 2: Créditos (Mínimo 1 crédito)
         gbc.gridx = 0; gbc.gridy = 2;
-        panelFormulario.add(new JLabel("Créditos:"), gbc);
+        panelFormulario.add(new JLabel("Creditos Academicos:"), gbc);
         gbc.gridx = 1;
         spnCreditos = new JSpinner(new SpinnerNumberModel(3, 1, 30, 1));
         panelFormulario.add(spnCreditos, gbc);
 
         panelIzquierdo.add(panelFormulario, BorderLayout.NORTH);
 
-        // Panel de Botones
-        JPanel panelBotones = new JPanel(new GridLayout(5, 1, 8, 8));
+        JPanel panelBotones = new JPanel(new GridLayout(6, 1, 8, 8));
         panelBotones.setOpaque(false);
-        panelBotones.setBorder(new EmptyBorder(10, 0, 0, 0));
+        panelBotones.setBorder(new EmptyBorder(8, 0, 0, 0));
 
-        btnGuardar = new JButton("➕ Registrar");
-        btnActualizar = new JButton("✏️ Actualizar");
-        btnEliminar = new JButton("🗑️ Eliminar");
-        btnLimpiar = new JButton("🧹 Limpiar Campos");
-        btnRefrescar = new JButton("🔄 Recargar Lista");
+        btnGuardar = new JButton("Registrar Materia");
+        btnActualizar = new JButton("Actualizar Materia");
+        btnEliminar = new JButton("Eliminar Materia");
+        btnLimpiar = new JButton("Limpiar Campos");
+        btnRefrescar = new JButton("Recargar Listado");
+        btnVolverMenu = new JButton("Volver al Menu Principal");
 
         configurarBoton(btnGuardar);
         configurarBoton(btnActualizar);
         configurarBoton(btnEliminar);
         configurarBoton(btnLimpiar);
         configurarBoton(btnRefrescar);
+        configurarBotonVolver(btnVolverMenu);
+
+        btnVolverMenu.addActionListener(e -> volverAlMenu());
 
         panelBotones.add(btnGuardar);
         panelBotones.add(btnActualizar);
         panelBotones.add(btnEliminar);
         panelBotones.add(btnLimpiar);
         panelBotones.add(btnRefrescar);
+        panelBotones.add(btnVolverMenu);
 
         panelIzquierdo.add(panelBotones, BorderLayout.CENTER);
         panelPrincipal.add(panelIzquierdo, BorderLayout.WEST);
 
-        // 3. PANEL DERECHO: TABLA DE MATERIAS
         JPanel panelTabla = new JPanel(new BorderLayout());
         panelTabla.setBackground(Color.WHITE);
         panelTabla.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(220, 224, 230), 1),
                 BorderFactory.createTitledBorder(
                         BorderFactory.createEmptyBorder(10, 10, 10, 10),
-                        "Listado de Materias Registradas",
+                        "Pensum de Materias",
                         TitledBorder.LEFT,
                         TitledBorder.TOP,
-                        new Font("Segoe UI", Font.BOLD, 14),
-                        new Color(50, 70, 90)
+                        new Font("Segoe UI", Font.BOLD, 13),
+                        new Color(11, 56, 97)
                 )
         ));
 
-        String[] columnas = {"ID", "Nombre Materia", "Créditos"};
+        String[] columnas = {"Codigo ID", "Descripcion (Materia)", "Creditos"};
         modeloTabla = new DefaultTableModel(columnas, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -151,14 +169,14 @@ public class MateriaView extends JFrame {
         tblMaterias = new JTable(modeloTabla);
         tblMaterias.setRowHeight(24);
         tblMaterias.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        tblMaterias.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
+        tblMaterias.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
+        tblMaterias.getTableHeader().setBackground(new Color(206, 212, 218));
         tblMaterias.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
         JScrollPane scrollTabla = new JScrollPane(tblMaterias);
         panelTabla.add(scrollTabla, BorderLayout.CENTER);
 
         panelPrincipal.add(panelTabla, BorderLayout.CENTER);
-
         setContentPane(panelPrincipal);
     }
 
@@ -168,7 +186,23 @@ public class MateriaView extends JFrame {
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
     }
 
-    // Getters
+    private void configurarBotonVolver(JButton btn) {
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setBackground(new Color(11, 56, 97));
+        btn.setForeground(Color.WHITE);
+        btn.setOpaque(true);
+        btn.setBorderPainted(false);
+        btn.setFocusPainted(false);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+    }
+
+    public void volverAlMenu() {
+        dispose();
+        if (menuPrincipal != null) {
+            menuPrincipal.setVisible(true);
+        }
+    }
+
     public JTextField getTxtId() { return txtId; }
     public JTextField getTxtNombreMateria() { return txtNombreMateria; }
     public JSpinner getSpnCreditos() { return spnCreditos; }
@@ -177,6 +211,7 @@ public class MateriaView extends JFrame {
     public JButton getBtnEliminar() { return btnEliminar; }
     public JButton getBtnLimpiar() { return btnLimpiar; }
     public JButton getBtnRefrescar() { return btnRefrescar; }
+    public JButton getBtnVolverMenu() { return btnVolverMenu; }
     public JTable getTblMaterias() { return tblMaterias; }
     public DefaultTableModel getModeloTabla() { return modeloTabla; }
 
@@ -188,7 +223,7 @@ public class MateriaView extends JFrame {
     }
 
     public void mostrarMensaje(String mensaje) {
-        JOptionPane.showMessageDialog(this, mensaje, "Información", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, mensaje, "Informacion", JOptionPane.INFORMATION_MESSAGE);
     }
 
     public void mostrarError(String mensaje) {
@@ -196,7 +231,7 @@ public class MateriaView extends JFrame {
     }
 
     public boolean confirmarAccion(String mensaje) {
-        int opcion = JOptionPane.showConfirmDialog(this, mensaje, "Confirmación",
+        int opcion = JOptionPane.showConfirmDialog(this, mensaje, "Confirmacion",
                 JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
         return opcion == JOptionPane.YES_OPTION;
     }

@@ -6,6 +6,8 @@ import com.sistema.modelo.Grupo;
 import com.sistema.modelo.GrupoDAO;
 import com.sistema.modelo.InscripcionCurso;
 import com.sistema.modelo.InscripcionCursoDAO;
+import com.sistema.modelo.Usuario;
+import com.sistema.servicio.InscripcionCursoService;
 import com.sistema.vista.InscripcionCursoView;
 
 import javax.swing.event.ListSelectionEvent;
@@ -14,21 +16,34 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
+import java.util.Optional;
 
-/**
- * Controlador para la gestión de Matrículas y Calificaciones en el patrón MVC.
- * Coordina la vista con las operaciones DAO de InscripcionCurso, Estudiante y Grupo.
- */
+// Controlador que conecta InscripcionCursoView con InscripcionCursoService y adapta permisos por rol
 public class InscripcionCursoController implements ActionListener {
 
     private final InscripcionCursoView vista;
-    private final InscripcionCursoDAO modeloDAO;
+    private final InscripcionCursoService servicio;
     private final EstudianteDao estudianteDAO;
     private final GrupoDAO grupoDAO;
+    private Usuario usuarioActual;
+    private Integer idEstudianteFijo;
 
     public InscripcionCursoController(InscripcionCursoView vista, InscripcionCursoDAO modeloDAO) {
+        this(vista, new InscripcionCursoService(modeloDAO), null);
+    }
+
+    public InscripcionCursoController(InscripcionCursoView vista, InscripcionCursoService servicio) {
+        this(vista, servicio, null);
+    }
+
+    public InscripcionCursoController(InscripcionCursoView vista, InscripcionCursoDAO modeloDAO, Usuario usuarioActual) {
+        this(vista, new InscripcionCursoService(modeloDAO), usuarioActual);
+    }
+
+    public InscripcionCursoController(InscripcionCursoView vista, InscripcionCursoService servicio, Usuario usuarioActual) {
         this.vista = vista;
-        this.modeloDAO = modeloDAO;
+        this.servicio = servicio;
+        this.usuarioActual = usuarioActual;
         this.estudianteDAO = new EstudianteDao();
         this.grupoDAO = new GrupoDAO();
         inicializarEventos();
@@ -52,29 +67,97 @@ public class InscripcionCursoController implements ActionListener {
     }
 
     public void iniciar() {
+        aplicarRestriccionesPorRol();
         cargarCombos();
         listarInscripciones();
         vista.setVisible(true);
     }
 
-    /**
-     * Llena los combos de estudiantes y grupos con datos de la base de datos.
-     */
+    // Restringe acciones segun el rol para que Estudiante solo matricule y Docente solo califique
+    private void aplicarRestriccionesPorRol() {
+        if (usuarioActual == null || usuarioActual.getRol() == null) {
+            return;
+        }
+        String rol = usuarioActual.getRol().toUpperCase();
+        if (rol.equals("ESTUDIANTE")) {
+            vista.getLblTituloBanner().setText("Matricula Academica de Asignaturas (Estudiante)");
+            vista.getCmbEstudiante().setEnabled(false);
+            vista.getTxtNotaFinal().setEnabled(false);
+            vista.getCmbEstado().setEnabled(false);
+            vista.getBtnActualizar().setVisible(false);
+            vista.getBtnEliminar().setVisible(false);
+            resolverEstudianteDeSesion();
+        } else if (rol.equals("DOCENTE")) {
+            vista.getLblTituloBanner().setText("Registro Docente de Calificaciones");
+            vista.getCmbEstudiante().setEnabled(false);
+            vista.getCmbGrupo().setEnabled(false);
+            vista.getBtnMatricular().setVisible(false);
+            vista.getBtnEliminar().setVisible(false);
+        }
+    }
+
+    private void resolverEstudianteDeSesion() {
+        List<Estudiante> todos = estudianteDAO.obtenerTodos();
+        if (usuarioActual.getIdEstudiante() != null) {
+            Optional<Estudiante> opt = estudianteDAO.buscarPorId(usuarioActual.getIdEstudiante());
+            if (opt.isPresent()) {
+                idEstudianteFijo = opt.get().getIdEstudiante();
+                return;
+            }
+        }
+        if (usuarioActual.getUsername() != null) {
+            String u = usuarioActual.getUsername().toLowerCase();
+            for (Estudiante e : todos) {
+                if (e.getNombre().toLowerCase().contains(u)
+                        || u.contains(e.getNombre().toLowerCase())
+                        || e.getEmail().toLowerCase().startsWith(u)) {
+                    idEstudianteFijo = e.getIdEstudiante();
+                    return;
+                }
+            }
+        }
+        if (!todos.isEmpty()) {
+            idEstudianteFijo = todos.get(0).getIdEstudiante();
+        }
+    }
+
     public void cargarCombos() {
         try {
             vista.getCmbEstudiante().removeAllItems();
-            List<Estudiante> estudiantes = estudianteDAO.obtenerTodos();
-            for (Estudiante est : estudiantes) {
-                vista.getCmbEstudiante().addItem(est.getIdEstudiante() + " - " + est.getNombre() + " " + est.getApellido());
+            if (idEstudianteFijo != null) {
+                Optional<Estudiante> estOpt = estudianteDAO.buscarPorId(idEstudianteFijo);
+                if (estOpt.isPresent()) {
+                    Estudiante est = estOpt.get();
+                    vista.getCmbEstudiante().addItem(est.getIdEstudiante() + " - " + est.getNombre() + " " + est.getApellido());
+                }
+            } else {
+                List<String> comboEstSp = servicio.obtenerComboEstudiantes();
+                if (!comboEstSp.isEmpty()) {
+                    for (String item : comboEstSp) {
+                        vista.getCmbEstudiante().addItem(item);
+                    }
+                } else {
+                    List<Estudiante> estudiantes = estudianteDAO.obtenerTodos();
+                    for (Estudiante est : estudiantes) {
+                        vista.getCmbEstudiante().addItem(est.getIdEstudiante() + " - " + est.getNombre() + " " + est.getApellido());
+                    }
+                }
             }
 
             vista.getCmbGrupo().removeAllItems();
-            List<Grupo> grupos = grupoDAO.listarTodos();
-            for (Grupo g : grupos) {
-                vista.getCmbGrupo().addItem(g.getIdGrupo() + " - Aula: " + g.getAula() + " (" + g.getHorario() + ")");
+            List<String> comboGrpSp = servicio.obtenerComboGrupos();
+            if (!comboGrpSp.isEmpty()) {
+                for (String item : comboGrpSp) {
+                    vista.getCmbGrupo().addItem(item);
+                }
+            } else {
+                List<Grupo> grupos = grupoDAO.listarTodos();
+                for (Grupo g : grupos) {
+                    vista.getCmbGrupo().addItem(g.getIdGrupo() + " - Aula: " + g.getAula() + " (" + g.getHorario() + ")");
+                }
             }
         } catch (Exception e) {
-            System.err.println("⚠️ Error al cargar combos de matrícula: " + e.getMessage());
+            System.err.println("Error al cargar combos: " + e.getMessage());
         }
     }
 
@@ -101,7 +184,13 @@ public class InscripcionCursoController implements ActionListener {
         DefaultTableModel modelTabla = vista.getModeloTabla();
         modelTabla.setRowCount(0);
 
-        List<InscripcionCurso> lista = modeloDAO.listar();
+        List<InscripcionCurso> lista;
+        if (idEstudianteFijo != null) {
+            lista = servicio.listarPorEstudiante(idEstudianteFijo);
+        } else {
+            lista = servicio.listarInscripciones();
+        }
+
         for (InscripcionCurso item : lista) {
             Object[] fila = {
                     item.getIdInscripcion(),
@@ -128,96 +217,93 @@ public class InscripcionCursoController implements ActionListener {
         int idEstudiante = extraerIdDeCombo(estSeleccionado);
         int idGrupo = extraerIdDeCombo(grupoSeleccionado);
 
-        if (modeloDAO.existeMatricula(idEstudiante, idGrupo)) {
-            vista.mostrarError("El estudiante ya se encuentra matriculado en este grupo.");
-            return;
-        }
-
-        Double nota = parsearNota(vista.getTxtNotaFinal().getText().trim());
-        String estado = (String) vista.getCmbEstado().getSelectedItem();
-
-        if (nota != null) {
-            if (nota < 0.0 || nota > 5.0) {
-                vista.mostrarError("La nota final debe estar entre 0.0 y 5.0.");
+        Double nota = null;
+        if (vista.getTxtNotaFinal().isEnabled()) {
+            nota = parsearNota(vista.getTxtNotaFinal().getText().trim());
+            if (nota != null && nota == -1.0) {
+                vista.mostrarError("La nota debe ser un numero valido (ej: 4.5).");
                 return;
             }
-            estado = nota >= 3.0 ? "Aprobado" : "Reprobado";
-        } else if (estado == null || estado.equals("Aprobado") || estado.equals("Reprobado")) {
-            estado = "Matriculado";
         }
 
-        InscripcionCurso nueva = new InscripcionCurso(idEstudiante, idGrupo, nota, estado);
-        boolean exito = modeloDAO.matricular(nueva);
+        String estado = (String) vista.getCmbEstado().getSelectedItem();
 
-        if (exito) {
-            vista.mostrarMensaje("✅ Estudiante matriculado exitosamente.");
-            vista.limpiarFormulario();
-            listarInscripciones();
-        } else {
-            vista.mostrarError("❌ No se pudo completar la matrícula.");
+        try {
+            InscripcionCurso nueva = new InscripcionCurso(idEstudiante, idGrupo, nota, estado);
+            boolean exito = servicio.matricularEstudiante(nueva);
+            if (exito) {
+                vista.mostrarMensaje("Asignatura matriculada exitosamente.");
+                vista.limpiarFormulario();
+                listarInscripciones();
+            } else {
+                vista.mostrarError("No se pudo registrar la matricula.");
+            }
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
         }
     }
 
     private void actualizarInscripcion() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
-            vista.mostrarError("Selecciona una matrícula de la tabla para calificar o actualizar.");
+            vista.mostrarError("Selecciona una fila de la tabla para guardar la calificacion.");
+            return;
+        }
+
+        Double nota = parsearNota(vista.getTxtNotaFinal().getText().trim());
+        if (nota != null && nota == -1.0) {
+            vista.mostrarError("La nota debe ser un numero valido entre 0.0 y 5.0.");
             return;
         }
 
         try {
             int idInscripcion = Integer.parseInt(idStr);
-            Double nota = parsearNota(vista.getTxtNotaFinal().getText().trim());
             String estado = (String) vista.getCmbEstado().getSelectedItem();
-
-            if (nota != null) {
-                if (nota < 0.0 || nota > 5.0) {
-                    vista.mostrarError("La nota final debe estar entre 0.0 y 5.0.");
-                    return;
-                }
-                estado = nota >= 3.0 ? "Aprobado" : "Reprobado";
-            }
 
             InscripcionCurso modificada = new InscripcionCurso();
             modificada.setIdInscripcion(idInscripcion);
             modificada.setNotaFinal(nota);
             modificada.setEstado(estado);
 
-            boolean exito = modeloDAO.actualizar(modificada);
+            boolean exito = servicio.actualizarCalificacion(modificada);
             if (exito) {
-                vista.mostrarMensaje("✅ Matrícula/Calificación actualizada con éxito.");
+                vista.mostrarMensaje("Calificacion guardada exitosamente.");
                 vista.limpiarFormulario();
                 listarInscripciones();
             } else {
-                vista.mostrarError("❌ No se pudo actualizar el registro.");
+                vista.mostrarError("No se pudo actualizar la calificacion.");
             }
         } catch (NumberFormatException e) {
-            vista.mostrarError("ID de inscripción no válido.");
+            vista.mostrarError("ID de inscripcion no valido.");
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
         }
     }
 
     private void eliminarInscripcion() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
-            vista.mostrarError("Selecciona una matrícula de la tabla para eliminar o cancelar.");
+            vista.mostrarError("Selecciona una matricula de la tabla para cancelar.");
             return;
         }
 
         try {
             int id = Integer.parseInt(idStr);
-            boolean confirmar = vista.confirmarAccion("¿Estás seguro de cancelar o eliminar la matrícula con ID " + id + "?");
+            boolean confirmar = vista.confirmarAccion("Deseas cancelar la matricula con ID " + id + "?");
             if (confirmar) {
-                boolean exito = modeloDAO.eliminar(id);
+                boolean exito = servicio.eliminarInscripcion(id);
                 if (exito) {
-                    vista.mostrarMensaje("✅ Matrícula eliminada exitosamente.");
+                    vista.mostrarMensaje("Matricula cancelada exitosamente.");
                     vista.limpiarFormulario();
                     listarInscripciones();
                 } else {
-                    vista.mostrarError("❌ No se pudo eliminar la matrícula.");
+                    vista.mostrarError("No se pudo cancelar la matricula.");
                 }
             }
         } catch (NumberFormatException e) {
-            vista.mostrarError("ID de inscripción no válido.");
+            vista.mostrarError("ID de inscripcion no valido.");
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
         }
     }
 
@@ -268,7 +354,7 @@ public class InscripcionCursoController implements ActionListener {
         try {
             return Double.parseDouble(textoNota.replace(",", "."));
         } catch (NumberFormatException e) {
-            return -1.0; // Inválido
+            return -1.0;
         }
     }
 }

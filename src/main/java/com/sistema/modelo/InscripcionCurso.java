@@ -2,28 +2,27 @@ package com.sistema.modelo;
 
 import java.util.Objects;
 
-/**
- * Entidad que representa una Inscripción / Matrícula de un Estudiante a un Curso (Grupo).
- * Mapea la tabla 'inscripcion_curso' de PostgreSQL (Supabase).
- */
+// Entidad para la tabla inscripcion_curso (matriculas y calificaciones)
 public class InscripcionCurso {
 
     private int idInscripcion;
     private int idEstudiante;
     private int idGrupo;
-    private Double notaFinal; // Nullable hasta que se registre la nota
-    private String estado;    // 'Matriculado', 'Aprobado', 'Reprobado', 'Cancelado'
+    private Double notaFinal;
+    private String estado;
 
-    // Atributos informativos para visualización en vistas / tablas (JOINs)
+    // Datos adicionales para mostrar en las tablas y boletin de notas
     private String nombreEstudiante;
-    private String infoGrupo; // ej: "Programación II - Lab 301"
+    private String infoGrupo;
+    private String nombreMateria;
+    private int creditos;
+    private String nombreDocente;
+    private String aulaHorario;
 
-    // Constructor vacío
     public InscripcionCurso() {
         this.estado = "Matriculado";
     }
 
-    // Constructor para nueva matrícula (sin ID ni nota inicial)
     public InscripcionCurso(int idEstudiante, int idGrupo) {
         this.idEstudiante = idEstudiante;
         this.idGrupo = idGrupo;
@@ -31,7 +30,6 @@ public class InscripcionCurso {
         this.notaFinal = null;
     }
 
-    // Constructor con nota y estado
     public InscripcionCurso(int idEstudiante, int idGrupo, Double notaFinal, String estado) {
         this.idEstudiante = idEstudiante;
         this.idGrupo = idGrupo;
@@ -39,7 +37,6 @@ public class InscripcionCurso {
         this.estado = estado != null ? estado : "Matriculado";
     }
 
-    // Constructor completo con ID
     public InscripcionCurso(int idInscripcion, int idEstudiante, int idGrupo, Double notaFinal, String estado) {
         this.idInscripcion = idInscripcion;
         this.idEstudiante = idEstudiante;
@@ -48,7 +45,6 @@ public class InscripcionCurso {
         this.estado = estado;
     }
 
-    // Getters y Setters
     public int getIdInscripcion() {
         return idInscripcion;
     }
@@ -103,6 +99,38 @@ public class InscripcionCurso {
 
     public void setInfoGrupo(String infoGrupo) {
         this.infoGrupo = infoGrupo;
+    }
+
+    public String getNombreMateria() {
+        return nombreMateria;
+    }
+
+    public void setNombreMateria(String nombreMateria) {
+        this.nombreMateria = nombreMateria;
+    }
+
+    public int getCreditos() {
+        return creditos;
+    }
+
+    public void setCreditos(int creditos) {
+        this.creditos = creditos;
+    }
+
+    public String getNombreDocente() {
+        return nombreDocente;
+    }
+
+    public void setNombreDocente(String nombreDocente) {
+        this.nombreDocente = nombreDocente;
+    }
+
+    public String getAulaHorario() {
+        return aulaHorario;
+    }
+
+    public void setAulaHorario(String aulaHorario) {
+        this.aulaHorario = aulaHorario;
     }
 
     @Override
