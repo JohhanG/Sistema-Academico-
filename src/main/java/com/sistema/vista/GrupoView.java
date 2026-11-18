@@ -188,6 +188,12 @@ public class GrupoView extends JFrame {
         tblGrupos.getTableHeader().setBackground(new Color(206, 212, 218));
         tblGrupos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
+        tblGrupos.getColumnModel().getColumn(0).setPreferredWidth(70);
+        tblGrupos.getColumnModel().getColumn(1).setPreferredWidth(75);
+        tblGrupos.getColumnModel().getColumn(2).setPreferredWidth(75);
+        tblGrupos.getColumnModel().getColumn(3).setPreferredWidth(130);
+        tblGrupos.getColumnModel().getColumn(4).setPreferredWidth(180);
+
         JScrollPane scrollTabla = new JScrollPane(tblGrupos);
         panelTabla.add(scrollTabla, BorderLayout.CENTER);
 
