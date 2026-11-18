@@ -2,6 +2,7 @@ package com.sistema.controlador;
 
 import com.sistema.modelo.Estudiante;
 import com.sistema.modelo.EstudianteDao;
+import com.sistema.servicio.EstudianteService;
 import com.sistema.vista.EstudianteView;
 
 import javax.swing.event.ListSelectionEvent;
@@ -11,43 +12,39 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
-/**
- * Controlador para la entidad Estudiante.
- * Orquesta la lógica de negocio, validaciones y la persistencia (DAO),
- * además de gestionar los eventos de la vista gráfica cuando está presente.
- */
+// Controlador que conecta EstudianteView con EstudianteService
 public class EstudianteController implements ActionListener {
 
-    private static final Pattern EMAIL_PATTERN =
-            Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-
-    private final EstudianteDao estudianteDao;
+    private final EstudianteService estudianteService;
     private EstudianteView vista;
 
-    // Constructor sin vista (solo lógica de negocio / servicios)
     public EstudianteController() {
-        this.estudianteDao = new EstudianteDao();
+        this.estudianteService = new EstudianteService();
     }
 
     public EstudianteController(EstudianteDao estudianteDao) {
-        if (estudianteDao == null) {
-            throw new IllegalArgumentException("El DAO de estudiante no puede ser nulo.");
-        }
-        this.estudianteDao = estudianteDao;
+        this.estudianteService = new EstudianteService(estudianteDao);
     }
 
-    // Constructor completo con Vista (para GUI Swing)
+    public EstudianteController(EstudianteService estudianteService) {
+        if (estudianteService == null) {
+            throw new IllegalArgumentException("El servicio de estudiante no puede ser nulo.");
+        }
+        this.estudianteService = estudianteService;
+    }
+
     public EstudianteController(EstudianteView vista, EstudianteDao estudianteDao) {
         this(estudianteDao);
         this.vista = vista;
         inicializarEventos();
     }
 
-    // =========================================================================
-    // MÉTODOS DE LA VISTA (INTERFAZ GRÁFICA SWING)
-    // =========================================================================
+    public EstudianteController(EstudianteView vista, EstudianteService estudianteService) {
+        this(estudianteService);
+        this.vista = vista;
+        inicializarEventos();
+    }
 
     private void inicializarEventos() {
         if (this.vista == null) return;
@@ -90,7 +87,7 @@ public class EstudianteController implements ActionListener {
             vista.limpiarFormulario();
         } else if (source == vista.getBtnRefrescar()) {
             listarEstudiantesEnTabla();
-            vista.mostrarMensaje("Lista de estudiantes actualizada correctamente.");
+            vista.mostrarMensaje("Lista de estudiantes actualizada.");
         }
     }
 
@@ -118,20 +115,20 @@ public class EstudianteController implements ActionListener {
 
         try {
             registrarEstudiante(nombre, apellido, email);
-            vista.mostrarMensaje("✅ Estudiante registrado exitosamente.");
+            vista.mostrarMensaje("Estudiante registrado exitosamente.");
             vista.limpiarFormulario();
             listarEstudiantesEnTabla();
         } catch (IllegalArgumentException ex) {
             vista.mostrarError(ex.getMessage());
         } catch (Exception ex) {
-            vista.mostrarError("❌ Error al registrar estudiante: " + ex.getMessage());
+            vista.mostrarError("Error al registrar estudiante: " + ex.getMessage());
         }
     }
 
     private void ejecutarActualizacionDesdeVista() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
-            vista.mostrarError("Por favor selecciona un estudiante de la tabla para actualizar.");
+            vista.mostrarError("Selecciona un estudiante de la tabla para actualizar.");
             return;
         }
 
@@ -142,38 +139,38 @@ public class EstudianteController implements ActionListener {
         try {
             int id = Integer.parseInt(idStr);
             actualizarEstudiante(id, nombre, apellido, email);
-            vista.mostrarMensaje("✅ Estudiante actualizado exitosamente.");
+            vista.mostrarMensaje("Estudiante actualizado exitosamente.");
             vista.limpiarFormulario();
             listarEstudiantesEnTabla();
         } catch (NumberFormatException ex) {
-            vista.mostrarError("ID de estudiante inválido.");
+            vista.mostrarError("ID de estudiante invalido.");
         } catch (IllegalArgumentException ex) {
             vista.mostrarError(ex.getMessage());
         } catch (Exception ex) {
-            vista.mostrarError("❌ Error al actualizar estudiante: " + ex.getMessage());
+            vista.mostrarError("Error al actualizar estudiante: " + ex.getMessage());
         }
     }
 
     private void ejecutarEliminacionDesdeVista() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
-            vista.mostrarError("Por favor selecciona un estudiante de la tabla para eliminar.");
+            vista.mostrarError("Selecciona un estudiante de la tabla para eliminar.");
             return;
         }
 
         try {
             int id = Integer.parseInt(idStr);
-            boolean confirmar = vista.confirmarAccion("¿Estás seguro de eliminar el estudiante con ID " + id + "?");
+            boolean confirmar = vista.confirmarAccion("Deseas eliminar el estudiante con ID " + id + "?");
             if (confirmar) {
                 eliminarEstudiante(id);
-                vista.mostrarMensaje("✅ Estudiante eliminado exitosamente.");
+                vista.mostrarMensaje("Estudiante eliminado exitosamente.");
                 vista.limpiarFormulario();
                 listarEstudiantesEnTabla();
             }
         } catch (NumberFormatException ex) {
-            vista.mostrarError("ID de estudiante inválido.");
+            vista.mostrarError("ID de estudiante invalido.");
         } catch (Exception ex) {
-            vista.mostrarError("❌ Error al eliminar estudiante: " + ex.getMessage());
+            vista.mostrarError("Error al eliminar estudiante: " + ex.getMessage());
         }
     }
 
@@ -188,107 +185,35 @@ public class EstudianteController implements ActionListener {
         }
     }
 
-    // =========================================================================
-    // LÓGICA DE NEGOCIO Y PERSISTENCIA (SANTIAGO)
-    // =========================================================================
-
     public Estudiante registrarEstudiante(String nombre, String apellido, String email) {
-        Estudiante estudiante = new Estudiante(
-                nombre != null ? nombre.trim() : null,
-                apellido != null ? apellido.trim() : null,
-                email != null ? email.trim() : null
-        );
-        registrarEstudiante(estudiante);
-        return estudiante;
+        return estudianteService.registrarEstudiante(nombre, apellido, email);
     }
 
     public void registrarEstudiante(Estudiante estudiante) {
-        validarEstudiante(estudiante);
-
-        Optional<Estudiante> existente = estudianteDao.buscarPorEmail(estudiante.getEmail());
-        if (existente.isPresent()) {
-            throw new IllegalArgumentException("Ya existe un estudiante registrado con el email: " + estudiante.getEmail());
-        }
-
-        estudianteDao.guardar(estudiante);
+        estudianteService.registrarEstudiante(estudiante);
     }
 
     public List<Estudiante> obtenerTodosLosEstudiantes() {
-        return estudianteDao.obtenerTodos();
+        return estudianteService.obtenerTodosLosEstudiantes();
     }
 
     public Optional<Estudiante> buscarEstudiantePorId(int id) {
-        if (id <= 0) {
-            throw new IllegalArgumentException("El ID del estudiante debe ser mayor a cero.");
-        }
-        return estudianteDao.buscarPorId(id);
+        return estudianteService.buscarEstudiantePorId(id);
     }
 
     public Optional<Estudiante> buscarEstudiantePorEmail(String email) {
-        if (email == null || email.trim().isEmpty()) {
-            throw new IllegalArgumentException("El email de búsqueda no puede estar vacío.");
-        }
-        return estudianteDao.buscarPorEmail(email.trim());
+        return estudianteService.buscarEstudiantePorEmail(email);
     }
 
     public void actualizarEstudiante(int id, String nombre, String apellido, String email) {
-        Estudiante estudiante = new Estudiante(
-                id,
-                nombre != null ? nombre.trim() : null,
-                apellido != null ? apellido.trim() : null,
-                email != null ? email.trim() : null
-        );
-        actualizarEstudiante(estudiante);
+        estudianteService.actualizarEstudiante(id, nombre, apellido, email);
     }
 
     public void actualizarEstudiante(Estudiante estudiante) {
-        if (estudiante == null || estudiante.getIdEstudiante() <= 0) {
-            throw new IllegalArgumentException("El estudiante o su ID es inválido para actualizar.");
-        }
-
-        validarEstudiante(estudiante);
-
-        Optional<Estudiante> existente = estudianteDao.buscarPorId(estudiante.getIdEstudiante());
-        if (existente.isEmpty()) {
-            throw new IllegalArgumentException("No se encontró el estudiante con ID: " + estudiante.getIdEstudiante());
-        }
-
-        Optional<Estudiante> porEmail = estudianteDao.buscarPorEmail(estudiante.getEmail());
-        if (porEmail.isPresent() && porEmail.get().getIdEstudiante() != estudiante.getIdEstudiante()) {
-            throw new IllegalArgumentException("El email ya está en uso por otro estudiante: " + estudiante.getEmail());
-        }
-
-        estudianteDao.actualizar(estudiante);
+        estudianteService.actualizarEstudiante(estudiante);
     }
 
     public void eliminarEstudiante(int id) {
-        if (id <= 0) {
-            throw new IllegalArgumentException("El ID del estudiante debe ser mayor a cero.");
-        }
-
-        Optional<Estudiante> existente = estudianteDao.buscarPorId(id);
-        if (existente.isEmpty()) {
-            throw new IllegalArgumentException("No se encontró el estudiante con ID: " + id);
-        }
-
-        estudianteDao.eliminar(id);
-    }
-
-    private void validarEstudiante(Estudiante estudiante) {
-        if (estudiante == null) {
-            throw new IllegalArgumentException("El estudiante no puede ser nulo.");
-        }
-        if (estudiante.getNombre() == null || estudiante.getNombre().trim().isEmpty()) {
-            throw new IllegalArgumentException("El nombre del estudiante es obligatorio.");
-        }
-        if (estudiante.getApellido() == null || estudiante.getApellido().trim().isEmpty()) {
-            throw new IllegalArgumentException("El apellido del estudiante es obligatorio.");
-        }
-        if (estudiante.getEmail() == null || estudiante.getEmail().trim().isEmpty()) {
-            throw new IllegalArgumentException("El email del estudiante es obligatorio.");
-        }
-        if (!EMAIL_PATTERN.matcher(estudiante.getEmail().trim()).matches()) {
-            throw new IllegalArgumentException("El formato del email no es válido.");
-        }
+        estudianteService.eliminarEstudiante(id);
     }
 }
