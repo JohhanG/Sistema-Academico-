@@ -2,6 +2,7 @@ package com.sistema.controlador;
 
 import com.sistema.modelo.Docente;
 import com.sistema.modelo.DocenteDAO;
+import com.sistema.servicio.DocenteService;
 import com.sistema.vista.DocenteView;
 
 import javax.swing.event.ListSelectionEvent;
@@ -11,18 +12,19 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
 
-/**
- * Controlador para la gestión de Docentes en el patrón MVC.
- * Coordina los eventos de la vista con la capa de persistencia (DAO).
- */
+// Controlador que conecta DocenteView con DocenteService
 public class DocenteController implements ActionListener {
 
     private final DocenteView vista;
-    private final DocenteDAO modelo;
+    private final DocenteService servicio;
 
     public DocenteController(DocenteView vista, DocenteDAO modelo) {
+        this(vista, new DocenteService(modelo));
+    }
+
+    public DocenteController(DocenteView vista, DocenteService servicio) {
         this.vista = vista;
-        this.modelo = modelo;
+        this.servicio = servicio;
         inicializarEventos();
     }
 
@@ -62,7 +64,7 @@ public class DocenteController implements ActionListener {
             vista.limpiarFormulario();
         } else if (source == vista.getBtnRefrescar()) {
             listarDocentes();
-            vista.mostrarMensaje("Lista de docentes actualizada correctamente.");
+            vista.mostrarMensaje("Lista de docentes actualizada.");
         }
     }
 
@@ -70,7 +72,7 @@ public class DocenteController implements ActionListener {
         DefaultTableModel modelTabla = vista.getModeloTabla();
         modelTabla.setRowCount(0);
 
-        List<Docente> lista = modelo.listar();
+        List<Docente> lista = servicio.listarDocentes();
         for (Docente doc : lista) {
             Object[] fila = {
                     doc.getIdDocente(),
@@ -85,75 +87,75 @@ public class DocenteController implements ActionListener {
         String nombre = vista.getTxtNombre().getText().trim();
         String especialidad = vista.getTxtEspecialidad().getText().trim();
 
-        if (!validarCampos(nombre, especialidad)) {
-            return;
-        }
+        try {
+            Docente nuevoDocente = new Docente(nombre, especialidad);
+            boolean exito = servicio.registrarDocente(nuevoDocente);
 
-        Docente nuevoDocente = new Docente(nombre, especialidad);
-        boolean exito = modelo.insertar(nuevoDocente);
-
-        if (exito) {
-            vista.mostrarMensaje("✅ Docente registrado exitosamente.");
-            vista.limpiarFormulario();
-            listarDocentes();
-        } else {
-            vista.mostrarError("❌ No se pudo registrar el docente en la base de datos.");
+            if (exito) {
+                vista.mostrarMensaje("Docente registrado exitosamente.");
+                vista.limpiarFormulario();
+                listarDocentes();
+            } else {
+                vista.mostrarError("No se pudo registrar el docente.");
+            }
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
         }
     }
 
     private void actualizarDocente() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
-            vista.mostrarError("Por favor selecciona un docente de la tabla para actualizar.");
+            vista.mostrarError("Selecciona un docente de la tabla para actualizar.");
             return;
         }
 
         String nombre = vista.getTxtNombre().getText().trim();
         String especialidad = vista.getTxtEspecialidad().getText().trim();
 
-        if (!validarCampos(nombre, especialidad)) {
-            return;
-        }
-
         try {
             int id = Integer.parseInt(idStr);
             Docente docente = new Docente(id, nombre, especialidad);
-            boolean exito = modelo.actualizar(docente);
+            boolean exito = servicio.actualizarDocente(docente);
 
             if (exito) {
-                vista.mostrarMensaje("✅ Docente actualizado exitosamente.");
+                vista.mostrarMensaje("Docente actualizado exitosamente.");
                 vista.limpiarFormulario();
                 listarDocentes();
             } else {
-                vista.mostrarError("❌ No se pudo actualizar el docente.");
+                vista.mostrarError("No se pudo actualizar el docente.");
             }
         } catch (NumberFormatException ex) {
-            vista.mostrarError("ID de docente inválido.");
+            vista.mostrarError("ID de docente invalido.");
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
         }
     }
 
     private void eliminarDocente() {
         String idStr = vista.getTxtId().getText().trim();
         if (idStr.isEmpty()) {
-            vista.mostrarError("Por favor selecciona un docente de la tabla para eliminar.");
+            vista.mostrarError("Selecciona un docente de la tabla para eliminar.");
             return;
         }
 
         try {
             int id = Integer.parseInt(idStr);
-            boolean confirmar = vista.confirmarAccion("¿Estás seguro de eliminar el docente con ID " + id + "?");
+            boolean confirmar = vista.confirmarAccion("Deseas eliminar el docente con ID " + id + "?");
             if (confirmar) {
-                boolean exito = modelo.eliminar(id);
+                boolean exito = servicio.eliminarDocente(id);
                 if (exito) {
-                    vista.mostrarMensaje("✅ Docente eliminado exitosamente.");
+                    vista.mostrarMensaje("Docente eliminado exitosamente.");
                     vista.limpiarFormulario();
                     listarDocentes();
                 } else {
-                    vista.mostrarError("❌ No se pudo eliminar el docente. Puede tener grupos o cursos asignados.");
+                    vista.mostrarError("No se pudo eliminar el docente.");
                 }
             }
         } catch (NumberFormatException ex) {
-            vista.mostrarError("ID de docente inválido.");
+            vista.mostrarError("ID de docente invalido.");
+        } catch (IllegalArgumentException ex) {
+            vista.mostrarError(ex.getMessage());
         }
     }
 
@@ -164,13 +166,5 @@ public class DocenteController implements ActionListener {
             vista.getTxtNombre().setText(vista.getModeloTabla().getValueAt(fila, 1).toString());
             vista.getTxtEspecialidad().setText(vista.getModeloTabla().getValueAt(fila, 2).toString());
         }
-    }
-
-    private boolean validarCampos(String nombre, String especialidad) {
-        if (nombre.isEmpty() || especialidad.isEmpty()) {
-            vista.mostrarError("Todos los campos (Nombre y Especialidad) son obligatorios.");
-            return false;
-        }
-        return true;
     }
 }
