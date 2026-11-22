@@ -21,13 +21,6 @@ import java.util.Properties;
  */
 public class EstudianteDao {
 
-    private static final String CONFIG_FILE = "config.properties";
-    private static final String DEFAULT_SUPABASE_HOST = "db.qwtdiaeruuxshrmxsaoo.supabase.co";
-    private static final String DEFAULT_JDBC_URL =
-            "jdbc:postgresql://" + DEFAULT_SUPABASE_HOST + ":5432/postgres?sslmode=require";
-    private static final String DEFAULT_USER = "postgres";
-    private static final String DEFAULT_PASSWORD = "heidyexpone1";
-
     private final Connection externalConnection;
 
     public EstudianteDao() {
@@ -43,62 +36,15 @@ public class EstudianteDao {
      * conexión inyectada o leyendo el archivo config.properties en la raíz del proyecto.
      */
     protected Connection obtenerConexion() throws SQLException {
-        if (externalConnection != null && !externalConnection.isClosed()) {
+        if (externalConnection != null) {
+            if (externalConnection.isClosed()) throw new SQLException("La conexion de prueba esta cerrada.");
             return externalConnection;
         }
-
-        Properties properties = new Properties();
-        File archivoConfig = new File(CONFIG_FILE);
-        if (archivoConfig.exists()) {
-            try (FileInputStream fis = new FileInputStream(archivoConfig)) {
-                properties.load(fis);
-            } catch (IOException e) {
-                throw new SQLException("Error al leer el archivo " + CONFIG_FILE, e);
-            }
-        }
-
-        String rawUrl = properties.getProperty("URL",
-                properties.getProperty("db.url", DEFAULT_JDBC_URL)).trim();
-        String url = normalizarUrlJdbc(rawUrl);
-        String user = properties.getProperty("USER",
-                properties.getProperty("db.user", DEFAULT_USER)).trim();
-        String password = properties.getProperty("PASSWORD",
-                properties.getProperty("db.password", DEFAULT_PASSWORD)).trim();
-
-        if (user.isEmpty() && password.isEmpty()) {
-            return DriverManager.getConnection(url);
-        }
-        return DriverManager.getConnection(url, user, password);
-    }
-
-    /**
-     * Convierte una URL HTTPS de proyecto Supabase (https://<ref>.supabase.co)
-     * en una URL JDBC de PostgreSQL válida si es necesario.
-     */
-    private String normalizarUrlJdbc(String rawUrl) {
-        if (rawUrl == null || rawUrl.isEmpty()) {
-            return DEFAULT_JDBC_URL;
-        }
-        if (rawUrl.startsWith("jdbc:")) {
-            return rawUrl;
-        }
-        if (rawUrl.startsWith("https://") || rawUrl.startsWith("http://")) {
-            String host = rawUrl.replaceFirst("^https?://", "").replaceAll("/+$", "");
-            if (!host.startsWith("db.") && host.endsWith(".supabase.co")) {
-                host = "db." + host;
-            }
-            return "jdbc:postgresql://" + host + ":5432/postgres?sslmode=require";
-        }
-        return rawUrl;
+        return com.sistema.config.ConexionBD.getConexion();
     }
 
     private void cerrarConexionSiEsPropia(Connection conn) {
-        if (conn != null && conn != externalConnection) {
-            try {
-                conn.close();
-            } catch (SQLException ignored) {
-            }
-        }
+        // La conexion compartida y las conexiones inyectadas pertenecen a quien las crea.
     }
 
     /**
@@ -124,7 +70,7 @@ public class EstudianteDao {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Error al guardar el estudiante en base de datos", e);
+            throw com.sistema.config.ErrorDatos.desde(e);
         } finally {
             cerrarConexionSiEsPropia(conn);
         }
@@ -148,7 +94,7 @@ public class EstudianteDao {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Error al obtener los estudiantes de la base de datos", e);
+            throw com.sistema.config.ErrorDatos.desde(e);
         } finally {
             cerrarConexionSiEsPropia(conn);
         }
@@ -174,7 +120,7 @@ public class EstudianteDao {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Error al buscar el estudiante por ID en la base de datos", e);
+            throw com.sistema.config.ErrorDatos.desde(e);
         } finally {
             cerrarConexionSiEsPropia(conn);
         }
@@ -185,7 +131,7 @@ public class EstudianteDao {
      * Busca un estudiante por su correo electrónico.
      */
     public Optional<Estudiante> buscarPorEmail(String email) {
-        String sql = "SELECT id_estudiante, nombre, apellido, email FROM estudiante WHERE email = ?";
+        String sql = "SELECT id_estudiante, nombre, apellido, email FROM estudiante WHERE LOWER(email) = LOWER(?)";
         Connection conn = null;
 
         try {
@@ -200,7 +146,7 @@ public class EstudianteDao {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Error al buscar el estudiante por email en la base de datos", e);
+            throw com.sistema.config.ErrorDatos.desde(e);
         } finally {
             cerrarConexionSiEsPropia(conn);
         }
@@ -228,7 +174,7 @@ public class EstudianteDao {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Error al actualizar el estudiante en la base de datos", e);
+            throw com.sistema.config.ErrorDatos.desde(e);
         } finally {
             cerrarConexionSiEsPropia(conn);
         }
@@ -238,7 +184,7 @@ public class EstudianteDao {
      * Elimina un estudiante por su identificador único.
      */
     public void eliminar(int id) {
-        String sql = "DELETE FROM estudiante WHERE id_estudiante = ?";
+        String sql = "DELETE FROM estudiante WHERE id_estudiante = ? AND NOT EXISTS (SELECT 1 FROM inscripcion_curso d WHERE d.id_estudiante = estudiante.id_estudiante) AND NOT EXISTS (SELECT 1 FROM usuario d WHERE d.id_estudiante = estudiante.id_estudiante)";
         Connection conn = null;
 
         try {
@@ -248,11 +194,11 @@ public class EstudianteDao {
 
                 int filas = pstmt.executeUpdate();
                 if (filas == 0) {
-                    throw new RuntimeException("Estudiante no encontrado con ID: " + id);
+                    throw new IllegalArgumentException("No se puede eliminar: el estudiante no existe o tiene matriculas o una cuenta asociada.");
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Error al eliminar el estudiante en la base de datos", e);
+            throw com.sistema.config.ErrorDatos.desde(e);
         } finally {
             cerrarConexionSiEsPropia(conn);
         }

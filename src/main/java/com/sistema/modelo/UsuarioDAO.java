@@ -15,6 +15,20 @@ import java.util.List;
 // DAO para gestionar usuarios y login en la tabla usuario
 public class UsuarioDAO {
 
+    public boolean existeVinculoEnOtraCuenta(Integer idEstudiante, Integer idDocente, int idUsuario) {
+        String sql = "SELECT 1 FROM usuario WHERE id_usuario <> ? AND "
+                + (idEstudiante != null ? "id_estudiante = ?" : "id_docente = ?");
+        Connection conn = ConexionBD.getConexion();
+        if (conn == null) throw new IllegalStateException("No se pudo verificar la asociacion de la cuenta.");
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idUsuario);
+            ps.setInt(2, idEstudiante != null ? idEstudiante : idDocente);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
+        } catch (SQLException e) {
+            throw new IllegalStateException("No se pudo verificar la asociacion de la cuenta.", e);
+        }
+    }
+
     public Usuario autenticar(String username, String passwordPlano) {
         Usuario usuario = buscarPorUsername(username);
         if (usuario == null) {
@@ -41,7 +55,7 @@ public class UsuarioDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error al buscar usuario: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return null;
     }
@@ -61,7 +75,7 @@ public class UsuarioDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error al buscar usuario por ID: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return null;
     }
@@ -75,7 +89,7 @@ public class UsuarioDAO {
 
         String passwordHash = usuario.getPassword();
         if (!SeguridadUtil.esHashValido(passwordHash)) {
-            passwordHash = SeguridadUtil.hashSHA512(passwordHash);
+            passwordHash = SeguridadUtil.hashPassword(passwordHash);
             usuario.setPassword(passwordHash);
         }
 
@@ -104,7 +118,7 @@ public class UsuarioDAO {
                 return true;
             }
         } catch (SQLException e) {
-            System.err.println("Error al insertar usuario: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return false;
     }
@@ -123,7 +137,7 @@ public class UsuarioDAO {
                 lista.add(mapear(rs));
             }
         } catch (SQLException e) {
-            System.err.println("Error al listar usuarios: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return lista;
     }
@@ -137,7 +151,7 @@ public class UsuarioDAO {
 
         String passwordHash = usuario.getPassword();
         if (!SeguridadUtil.esHashValido(passwordHash)) {
-            passwordHash = SeguridadUtil.hashSHA512(passwordHash);
+            passwordHash = SeguridadUtil.hashPassword(passwordHash);
             usuario.setPassword(passwordHash);
         }
 
@@ -159,9 +173,8 @@ public class UsuarioDAO {
 
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error al actualizar usuario: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     public boolean eliminar(int idUsuario) {
@@ -175,9 +188,8 @@ public class UsuarioDAO {
             ps.setInt(1, idUsuario);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error al eliminar usuario: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     private Usuario mapear(ResultSet rs) throws SQLException {

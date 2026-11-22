@@ -34,7 +34,7 @@ public class DocenteDAO {
                 return true;
             }
         } catch (SQLException e) {
-            System.err.println("Error al insertar docente: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return false;
     }
@@ -58,7 +58,7 @@ public class DocenteDAO {
                 lista.add(doc);
             }
         } catch (SQLException e) {
-            System.err.println("Error al listar docentes: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return lista;
     }
@@ -76,13 +76,12 @@ public class DocenteDAO {
             ps.setInt(3, docente.getIdDocente());
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error al actualizar docente: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     public boolean eliminar(int idDocente) {
-        String sql = "DELETE FROM docente WHERE id_docente = ?";
+        String sql = "DELETE FROM docente WHERE id_docente = ? AND NOT EXISTS (SELECT 1 FROM grupo d WHERE d.id_docente = docente.id_docente) AND NOT EXISTS (SELECT 1 FROM usuario d WHERE d.id_docente = docente.id_docente)";
         Connection conn = ConexionBD.getConexion();
         if (conn == null) {
             return false;
@@ -90,11 +89,11 @@ public class DocenteDAO {
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idDocente);
-            return ps.executeUpdate() > 0;
+            if (ps.executeUpdate() == 0) throw new IllegalArgumentException("No se puede eliminar: el registro no existe o tiene informacion academica asociada.");
+            return true;
         } catch (SQLException e) {
-            System.err.println("Error al eliminar docente: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     public Docente buscarPorId(int idDocente) {
@@ -116,7 +115,7 @@ public class DocenteDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error al buscar docente: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return null;
     }

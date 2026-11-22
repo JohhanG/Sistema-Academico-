@@ -61,8 +61,9 @@ public class MateriaService {
         if (materia.getNombreMateria() == null || materia.getNombreMateria().trim().isEmpty()) {
             throw new IllegalArgumentException("El nombre de la materia es obligatorio.");
         }
-        if (materia.getCreditos() <= 0) {
-            throw new IllegalArgumentException("Los creditos deben ser mayores a 0.");
+        materia.setNombreMateria(Validaciones.texto(materia.getNombreMateria(),"El nombre de la materia",100));
+        if (materia.getCreditos() < 1 || materia.getCreditos() > 10) {
+            throw new IllegalArgumentException("Los creditos deben estar entre 1 y 10.");
         }
     }
 }

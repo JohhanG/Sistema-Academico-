@@ -132,7 +132,8 @@ class AcademicServicesTest {
 
         Usuario nuevo = new Usuario("admin_prueba", "admin123", "ADMIN");
         assertTrue(service.registrarUsuario(nuevo));
-        assertEquals(SeguridadUtil.hashSHA512("admin123"), nuevo.getPassword());
+        assertTrue(nuevo.getPassword().startsWith("pbkdf2$"));
+        assertTrue(SeguridadUtil.verificarPassword("admin123", nuevo.getPassword()));
 
         Usuario loginOk = service.autenticar("admin_prueba", "admin123");
         assertNotNull(loginOk);

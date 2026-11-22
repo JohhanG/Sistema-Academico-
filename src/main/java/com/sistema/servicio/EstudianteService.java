@@ -108,18 +108,8 @@ public class EstudianteService {
         if (estudiante == null) {
             throw new IllegalArgumentException("El estudiante no puede ser nulo.");
         }
-        if (estudiante.getNombre() == null || estudiante.getNombre().trim().isEmpty()) {
-            throw new IllegalArgumentException("El nombre es obligatorio.");
-        }
-        if (estudiante.getApellido() == null || estudiante.getApellido().trim().isEmpty()) {
-            throw new IllegalArgumentException("El apellido es obligatorio.");
-        }
-        if (estudiante.getEmail() == null || estudiante.getEmail().trim().isEmpty()) {
-            throw new IllegalArgumentException("El email es obligatorio.");
-        }
-        String correo = estudiante.getEmail().trim();
-        if (!correo.contains("@") || !correo.contains(".")) {
-            throw new IllegalArgumentException("El formato del email no es valido.");
-        }
+        estudiante.setNombre(Validaciones.texto(estudiante.getNombre(),"El nombre",100));
+        estudiante.setApellido(Validaciones.texto(estudiante.getApellido(),"El apellido",100));
+        estudiante.setEmail(Validaciones.correo(estudiante.getEmail()));
     }
 }

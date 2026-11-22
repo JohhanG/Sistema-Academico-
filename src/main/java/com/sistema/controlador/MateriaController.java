@@ -1,5 +1,7 @@
 package com.sistema.controlador;
 
+import com.sistema.vista.TrabajoUI;
+
 import com.sistema.modelo.Materia;
 import com.sistema.modelo.MateriaDAO;
 import com.sistema.servicio.MateriaService;
@@ -52,6 +54,7 @@ public class MateriaController implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (TrabajoUI.ocupado(vista)) return;
         Object source = e.getSource();
 
         if (source == vista.getBtnGuardar()) {
@@ -64,7 +67,6 @@ public class MateriaController implements ActionListener {
             vista.limpiarFormulario();
         } else if (source == vista.getBtnRefrescar()) {
             listarMaterias();
-            vista.mostrarMensaje("Lista de materias actualizada.");
         }
     }
 
@@ -72,7 +74,7 @@ public class MateriaController implements ActionListener {
         DefaultTableModel modelTabla = vista.getModeloTabla();
         modelTabla.setRowCount(0);
 
-        List<Materia> lista = servicio.listarMaterias();
+        TrabajoUI.ejecutar(vista, () -> servicio.listarMaterias(), lista -> {
         for (Materia mat : lista) {
             Object[] fila = {
                     mat.getIdMateria(),
@@ -81,6 +83,7 @@ public class MateriaController implements ActionListener {
             };
             modelTabla.addRow(fila);
         }
+        }, vista::mostrarError);
     }
 
     private void registrarMateria() {
@@ -89,8 +92,7 @@ public class MateriaController implements ActionListener {
 
         try {
             Materia nuevaMateria = new Materia(nombre, creditos);
-            boolean exito = servicio.registrarMateria(nuevaMateria);
-
+            TrabajoUI.ejecutar(vista, () -> servicio.registrarMateria(nuevaMateria), exito -> {
             if (exito) {
                 vista.mostrarMensaje("Materia registrada exitosamente.");
                 vista.limpiarFormulario();
@@ -98,6 +100,7 @@ public class MateriaController implements ActionListener {
             } else {
                 vista.mostrarError("No se pudo registrar la materia.");
             }
+            }, vista::mostrarError);
         } catch (IllegalArgumentException ex) {
             vista.mostrarError(ex.getMessage());
         }
@@ -116,8 +119,7 @@ public class MateriaController implements ActionListener {
         try {
             int id = Integer.parseInt(idStr);
             Materia materia = new Materia(id, nombre, creditos);
-            boolean exito = servicio.actualizarMateria(materia);
-
+            TrabajoUI.ejecutar(vista, () -> servicio.actualizarMateria(materia), exito -> {
             if (exito) {
                 vista.mostrarMensaje("Materia actualizada exitosamente.");
                 vista.limpiarFormulario();
@@ -125,6 +127,7 @@ public class MateriaController implements ActionListener {
             } else {
                 vista.mostrarError("No se pudo actualizar la materia.");
             }
+            }, vista::mostrarError);
         } catch (NumberFormatException ex) {
             vista.mostrarError("ID de materia invalido.");
         } catch (IllegalArgumentException ex) {
@@ -143,14 +146,15 @@ public class MateriaController implements ActionListener {
             int id = Integer.parseInt(idStr);
             boolean confirmar = vista.confirmarAccion("Deseas eliminar la materia con ID " + id + "?");
             if (confirmar) {
-                boolean exito = servicio.eliminarMateria(id);
-                if (exito) {
+                TrabajoUI.ejecutar(vista, () -> servicio.eliminarMateria(id), exito -> {
+            if (exito) {
                     vista.mostrarMensaje("Materia eliminada exitosamente.");
                     vista.limpiarFormulario();
                     listarMaterias();
                 } else {
                     vista.mostrarError("No se pudo eliminar la materia.");
                 }
+            }, vista::mostrarError);
             }
         } catch (NumberFormatException ex) {
             vista.mostrarError("ID de materia invalido.");

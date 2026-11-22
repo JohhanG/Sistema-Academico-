@@ -1,5 +1,7 @@
 package com.sistema.controlador;
 
+import com.sistema.vista.TrabajoUI;
+
 import com.sistema.modelo.Docente;
 import com.sistema.modelo.DocenteDAO;
 import com.sistema.servicio.DocenteService;
@@ -52,6 +54,7 @@ public class DocenteController implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (TrabajoUI.ocupado(vista)) return;
         Object source = e.getSource();
 
         if (source == vista.getBtnGuardar()) {
@@ -64,7 +67,6 @@ public class DocenteController implements ActionListener {
             vista.limpiarFormulario();
         } else if (source == vista.getBtnRefrescar()) {
             listarDocentes();
-            vista.mostrarMensaje("Lista de docentes actualizada.");
         }
     }
 
@@ -72,7 +74,7 @@ public class DocenteController implements ActionListener {
         DefaultTableModel modelTabla = vista.getModeloTabla();
         modelTabla.setRowCount(0);
 
-        List<Docente> lista = servicio.listarDocentes();
+        TrabajoUI.ejecutar(vista, () -> servicio.listarDocentes(), lista -> {
         for (Docente doc : lista) {
             Object[] fila = {
                     doc.getIdDocente(),
@@ -81,6 +83,7 @@ public class DocenteController implements ActionListener {
             };
             modelTabla.addRow(fila);
         }
+        }, vista::mostrarError);
     }
 
     private void registrarDocente() {
@@ -89,8 +92,7 @@ public class DocenteController implements ActionListener {
 
         try {
             Docente nuevoDocente = new Docente(nombre, especialidad);
-            boolean exito = servicio.registrarDocente(nuevoDocente);
-
+            TrabajoUI.ejecutar(vista, () -> servicio.registrarDocente(nuevoDocente), exito -> {
             if (exito) {
                 vista.mostrarMensaje("Docente registrado exitosamente.");
                 vista.limpiarFormulario();
@@ -98,6 +100,7 @@ public class DocenteController implements ActionListener {
             } else {
                 vista.mostrarError("No se pudo registrar el docente.");
             }
+            }, vista::mostrarError);
         } catch (IllegalArgumentException ex) {
             vista.mostrarError(ex.getMessage());
         }
@@ -116,8 +119,7 @@ public class DocenteController implements ActionListener {
         try {
             int id = Integer.parseInt(idStr);
             Docente docente = new Docente(id, nombre, especialidad);
-            boolean exito = servicio.actualizarDocente(docente);
-
+            TrabajoUI.ejecutar(vista, () -> servicio.actualizarDocente(docente), exito -> {
             if (exito) {
                 vista.mostrarMensaje("Docente actualizado exitosamente.");
                 vista.limpiarFormulario();
@@ -125,6 +127,7 @@ public class DocenteController implements ActionListener {
             } else {
                 vista.mostrarError("No se pudo actualizar el docente.");
             }
+            }, vista::mostrarError);
         } catch (NumberFormatException ex) {
             vista.mostrarError("ID de docente invalido.");
         } catch (IllegalArgumentException ex) {
@@ -143,14 +146,15 @@ public class DocenteController implements ActionListener {
             int id = Integer.parseInt(idStr);
             boolean confirmar = vista.confirmarAccion("Deseas eliminar el docente con ID " + id + "?");
             if (confirmar) {
-                boolean exito = servicio.eliminarDocente(id);
-                if (exito) {
+                TrabajoUI.ejecutar(vista, () -> servicio.eliminarDocente(id), exito -> {
+            if (exito) {
                     vista.mostrarMensaje("Docente eliminado exitosamente.");
                     vista.limpiarFormulario();
                     listarDocentes();
                 } else {
                     vista.mostrarError("No se pudo eliminar el docente.");
                 }
+            }, vista::mostrarError);
             }
         } catch (NumberFormatException ex) {
             vista.mostrarError("ID de docente invalido.");

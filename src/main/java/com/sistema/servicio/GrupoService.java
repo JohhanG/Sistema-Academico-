@@ -76,6 +76,8 @@ public class GrupoService {
         if (grupo.getIdDocente() <= 0) {
             throw new IllegalArgumentException("El ID del docente debe ser mayor a cero.");
         }
+        grupo.setAula(Validaciones.texto(grupo.getAula(),"El aula",50));
+        grupo.setHorario(Validaciones.texto(grupo.getHorario(),"El horario",100));
         if (grupo.getAula() == null || grupo.getAula().trim().isEmpty()) {
             throw new IllegalArgumentException("El aula no puede estar vacia.");
         }
