@@ -40,8 +40,8 @@ public class UsuarioView extends JFrame {
 
     private void initComponents() {
         setTitle("Sistema Academico - Control de Accesos y Roles");
-        setSize(850, 580);
-        setMinimumSize(new Dimension(750, 500));
+        setSize(1050, 720);
+        setMinimumSize(new Dimension(950, 680));
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -182,7 +182,7 @@ public class UsuarioView extends JFrame {
                 )
         ));
 
-        String[] columnas = {"ID", "Username", "Rol", "Hash Contrasena"};
+        String[] columnas = {"ID", "Usuario", "Rol", "Estudiante ID", "Docente ID"};
         modeloTabla = new DefaultTableModel(columnas, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -247,6 +247,8 @@ public class UsuarioView extends JFrame {
         txtUsername.setText("");
         txtPassword.setText("");
         cmbRol.setSelectedIndex(0);
+        cmbEstudiante.setSelectedIndex(-1);
+        cmbDocente.setSelectedIndex(-1);
         tblUsuarios.clearSelection();
     }
 

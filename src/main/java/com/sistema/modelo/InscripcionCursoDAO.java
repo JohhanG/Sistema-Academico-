@@ -80,6 +80,14 @@ public class InscripcionCursoDAO {
 
     // Obtiene las materias y notas de un estudiante especifico
     public List<InscripcionCurso> listarPorEstudiante(int idEstudiante) {
+        return listarDetalle("i.id_estudiante", idEstudiante);
+    }
+
+    public List<InscripcionCurso> listarPorDocente(int idDocente) {
+        return listarDetalle("g.id_docente", idDocente);
+    }
+
+    private List<InscripcionCurso> listarDetalle(String campo, int id) {
         List<InscripcionCurso> lista = new ArrayList<>();
         String sql = "SELECT i.id_inscripcion, i.id_estudiante, i.id_grupo, i.nota_final, i.estado, " +
                      "e.nombre || ' ' || e.apellido AS nombre_estudiante, " +
@@ -91,7 +99,7 @@ public class InscripcionCursoDAO {
                      "JOIN grupo g ON i.id_grupo = g.id_grupo " +
                      "JOIN materia m ON g.id_materia = m.id_materia " +
                      "JOIN docente d ON g.id_docente = d.id_docente " +
-                     "WHERE i.id_estudiante = ? " +
+                     "WHERE " + campo + " = ? " +
                      "ORDER BY m.nombre_materia ASC";
         Connection conn = ConexionBD.getConexion();
         if (conn == null) {
@@ -99,7 +107,7 @@ public class InscripcionCursoDAO {
         }
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idEstudiante);
+            ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     lista.add(mapearDetalle(rs));
@@ -135,7 +143,17 @@ public class InscripcionCursoDAO {
     }
 
     public boolean actualizar(InscripcionCurso inscripcion) {
-        String sql = "UPDATE inscripcion_curso SET nota_final = ?, estado = ? WHERE id_inscripcion = ?";
+        return actualizarCalificacion(inscripcion, null);
+    }
+
+    public boolean actualizarPorDocente(InscripcionCurso inscripcion, int idDocente) {
+        return actualizarCalificacion(inscripcion, idDocente);
+    }
+
+    private boolean actualizarCalificacion(InscripcionCurso inscripcion, Integer idDocente) {
+        String sql = "UPDATE inscripcion_curso SET nota_final = ?, estado = ? WHERE id_inscripcion = ?"
+                + (idDocente == null ? "" : " AND EXISTS (SELECT 1 FROM grupo g WHERE "
+                + "g.id_grupo = inscripcion_curso.id_grupo AND g.id_docente = ?)");
         Connection conn = ConexionBD.getConexion();
         if (conn == null) {
             return false;
@@ -150,6 +168,7 @@ public class InscripcionCursoDAO {
 
             ps.setString(2, inscripcion.getEstado());
             ps.setInt(3, inscripcion.getIdInscripcion());
+            if (idDocente != null) ps.setInt(4, idDocente);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("Error al actualizar inscripcion: " + e.getMessage());

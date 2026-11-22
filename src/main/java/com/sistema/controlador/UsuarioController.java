@@ -1,6 +1,8 @@
 package com.sistema.controlador;
 
 import com.sistema.modelo.Usuario;
+import com.sistema.modelo.Estudiante;
+import com.sistema.modelo.Docente;
 import com.sistema.servicio.UsuarioService;
 import com.sistema.vista.UsuarioView;
 
@@ -24,6 +26,7 @@ public class UsuarioController implements ActionListener {
     }
 
     private void inicializarEventos() {
+        vista.getCmbRol().addActionListener(e -> actualizarCamposPorRol());
         this.vista.getBtnGuardar().addActionListener(this);
         this.vista.getBtnActualizar().addActionListener(this);
         this.vista.getBtnEliminar().addActionListener(this);
@@ -41,6 +44,8 @@ public class UsuarioController implements ActionListener {
     }
 
     public void iniciar() {
+        cargarAsociaciones();
+        actualizarCamposPorRol();
         listarUsuarios();
         vista.setVisible(true);
     }
@@ -57,6 +62,8 @@ public class UsuarioController implements ActionListener {
         } else if (source == vista.getBtnLimpiar()) {
             vista.limpiarFormulario();
         } else if (source == vista.getBtnRefrescar()) {
+            vista.limpiarFormulario();
+            cargarAsociaciones();
             listarUsuarios();
             vista.mostrarMensaje("Lista de usuarios actualizada.");
         }
@@ -68,15 +75,12 @@ public class UsuarioController implements ActionListener {
 
         List<Usuario> lista = servicio.listarUsuarios();
         for (Usuario u : lista) {
-            String hash = u.getPassword();
-            if (hash != null && hash.length() > 20) {
-                hash = hash.substring(0, 20) + "...";
-            }
             Object[] fila = {
                     u.getIdUsuario(),
                     u.getUsername(),
                     u.getRol(),
-                    hash
+                    u.getIdEstudiante(),
+                    u.getIdDocente()
             };
             modelTabla.addRow(fila);
         }
@@ -89,6 +93,7 @@ public class UsuarioController implements ActionListener {
 
         try {
             Usuario nuevo = new Usuario(username, password, rol);
+            asignarAsociacion(nuevo);
             boolean exito = servicio.registrarUsuario(nuevo);
             if (exito) {
                 vista.mostrarMensaje("Usuario registrado exitosamente.");
@@ -97,7 +102,7 @@ public class UsuarioController implements ActionListener {
             } else {
                 vista.mostrarError("No se pudo registrar el usuario.");
             }
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException | IllegalStateException ex) {
             vista.mostrarError(ex.getMessage());
         }
     }
@@ -124,6 +129,7 @@ public class UsuarioController implements ActionListener {
             Usuario modificado = new Usuario(id, username, passFinal, rol,
                     actual != null ? actual.getIdEstudiante() : null,
                     actual != null ? actual.getIdDocente() : null);
+            asignarAsociacion(modificado);
 
             boolean exito = servicio.actualizarUsuario(modificado);
             if (exito) {
@@ -135,7 +141,7 @@ public class UsuarioController implements ActionListener {
             }
         } catch (NumberFormatException ex) {
             vista.mostrarError("ID de usuario invalido.");
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException | IllegalStateException ex) {
             vista.mostrarError(ex.getMessage());
         }
     }
@@ -173,6 +179,52 @@ public class UsuarioController implements ActionListener {
             vista.getTxtUsername().setText(vista.getModeloTabla().getValueAt(fila, 1).toString());
             vista.getTxtPassword().setText("");
             vista.getCmbRol().setSelectedItem(vista.getModeloTabla().getValueAt(fila, 2).toString());
+            seleccionarAsociacion(vista.getCmbEstudiante(), vista.getModeloTabla().getValueAt(fila, 3));
+            seleccionarAsociacion(vista.getCmbDocente(), vista.getModeloTabla().getValueAt(fila, 4));
+        }
+    }
+
+    private void cargarAsociaciones() {
+        vista.getCmbEstudiante().removeAllItems();
+        vista.getCmbDocente().removeAllItems();
+        for (Estudiante e : servicio.listarEstudiantes()) {
+            vista.getCmbEstudiante().addItem(e.getIdEstudiante() + " - " + e.getNombre() + " " + e.getApellido());
+        }
+        for (Docente d : servicio.listarDocentes()) {
+            vista.getCmbDocente().addItem(d.getIdDocente() + " - " + d.getNombre());
+        }
+        vista.getCmbEstudiante().setSelectedIndex(-1);
+        vista.getCmbDocente().setSelectedIndex(-1);
+    }
+
+    private void actualizarCamposPorRol() {
+        String rol = (String) vista.getCmbRol().getSelectedItem();
+        vista.getCmbEstudiante().setEnabled("ESTUDIANTE".equals(rol));
+        vista.getCmbDocente().setEnabled("DOCENTE".equals(rol));
+        if (!"ESTUDIANTE".equals(rol)) vista.getCmbEstudiante().setSelectedIndex(-1);
+        if (!"DOCENTE".equals(rol)) vista.getCmbDocente().setSelectedIndex(-1);
+    }
+
+    private void asignarAsociacion(Usuario usuario) {
+        usuario.setIdEstudiante("ESTUDIANTE".equals(usuario.getRol())
+                ? idSeleccionado(vista.getCmbEstudiante()) : null);
+        usuario.setIdDocente("DOCENTE".equals(usuario.getRol())
+                ? idSeleccionado(vista.getCmbDocente()) : null);
+    }
+
+    private Integer idSeleccionado(javax.swing.JComboBox<String> combo) {
+        String item = (String) combo.getSelectedItem();
+        return item == null ? null : Integer.valueOf(item.split(" - ", 2)[0]);
+    }
+
+    private void seleccionarAsociacion(javax.swing.JComboBox<String> combo, Object id) {
+        combo.setSelectedIndex(-1);
+        if (id == null) return;
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            if (combo.getItemAt(i).startsWith(id + " - ")) {
+                combo.setSelectedIndex(i);
+                return;
+            }
         }
     }
 }

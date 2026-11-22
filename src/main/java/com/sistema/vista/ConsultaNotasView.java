@@ -257,50 +257,56 @@ public class ConsultaNotasView extends JFrame implements ActionListener {
                 ? usuarioActual.getRol().toUpperCase()
                 : "ESTUDIANTE";
 
-        List<Estudiante> todos = estudianteDao.obtenerTodos();
         cmbEstudiantes.removeAllItems();
-        for (Estudiante e : todos) {
-            cmbEstudiantes.addItem(e.getIdEstudiante() + " - " + e.getNombre() + " " + e.getApellido());
-        }
+        modeloTabla.setRowCount(0);
+        lblValIdentificacion.setText("");
+        lblValNombre.setText("Sin datos disponibles");
+        lblValCorreo.setText("");
+        lblValCreditos.setText("0");
+        lblValPromedio.setText("Sin calificar");
 
         if (rol.equals("ESTUDIANTE")) {
             panelSelectorAdmin.setVisible(false);
-            Estudiante est = resolverEstudianteDeUsuario(todos);
-            if (est != null) {
+            try {
+                Estudiante est = new com.sistema.servicio.IdentidadAcademicaService(estudianteDao)
+                        .exigirEstudiante(usuarioActual);
                 mostrarBoletinDeEstudiante(est);
-            } else {
-                lblValNombre.setText(usuarioActual.getUsername().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                modeloTabla.setRowCount(0);
+                lblValNombre.setText("Sin estudiante asociado");
+                lblValPromedio.setText("Sin datos");
+                lblValCorreo.setText("");
+                lblValIdentificacion.setText("");
+                javax.swing.JOptionPane.showMessageDialog(this, e.getMessage(),
+                        "Cuenta sin vinculo valido", javax.swing.JOptionPane.WARNING_MESSAGE);
             }
         } else {
+            List<Estudiante> todos;
+            if (rol.equals("DOCENTE")) {
+                try {
+                    java.util.Set<Integer> ids = new java.util.LinkedHashSet<>();
+                    for (InscripcionCurso i : inscripcionService.listarParaUsuario(usuarioActual)) {
+                        ids.add(i.getIdEstudiante());
+                    }
+                    todos = new java.util.ArrayList<>();
+                    for (int id : ids) estudianteDao.buscarPorId(id).ifPresent(todos::add);
+                } catch (IllegalArgumentException e) {
+                    javax.swing.JOptionPane.showMessageDialog(this, e.getMessage());
+                    todos = java.util.Collections.emptyList();
+                }
+            } else if (rol.equals("ADMIN")) {
+                todos = estudianteDao.obtenerTodos();
+            } else {
+                todos = java.util.Collections.emptyList();
+            }
+            for (Estudiante e : todos) {
+                cmbEstudiantes.addItem(e.getIdEstudiante() + " - " + e.getNombre() + " " + e.getApellido());
+            }
             panelSelectorAdmin.setVisible(true);
             if (!todos.isEmpty()) {
                 mostrarBoletinDeEstudiante(todos.get(0));
             }
         }
-    }
-
-    // Busca el estudiante asociado al usuario que inicio sesion
-    private Estudiante resolverEstudianteDeUsuario(List<Estudiante> todos) {
-        if (usuarioActual != null && usuarioActual.getIdEstudiante() != null) {
-            Optional<Estudiante> opt = estudianteDao.buscarPorId(usuarioActual.getIdEstudiante());
-            if (opt.isPresent()) {
-                return opt.get();
-            }
-        }
-        if (usuarioActual != null && usuarioActual.getUsername() != null) {
-            String userLower = usuarioActual.getUsername().toLowerCase();
-            for (Estudiante e : todos) {
-                if (e.getNombre().toLowerCase().contains(userLower)
-                        || userLower.contains(e.getNombre().toLowerCase())
-                        || e.getEmail().toLowerCase().startsWith(userLower)) {
-                    return e;
-                }
-            }
-        }
-        if (!todos.isEmpty()) {
-            return todos.get(0);
-        }
-        return null;
     }
 
     private void mostrarBoletinDeEstudiante(Estudiante est) {
@@ -309,7 +315,9 @@ public class ConsultaNotasView extends JFrame implements ActionListener {
         lblValCorreo.setText(est.getEmail());
 
         modeloTabla.setRowCount(0);
-        List<InscripcionCurso> materias = inscripcionService.listarPorEstudiante(est.getIdEstudiante());
+        List<InscripcionCurso> materias = inscripcionService.listarParaUsuario(usuarioActual).stream()
+                .filter(i -> i.getIdEstudiante() == est.getIdEstudiante())
+                .collect(java.util.stream.Collectors.toList());
 
         int totalCreditos = 0;
         double sumaNotas = 0.0;
@@ -368,7 +376,9 @@ public class ConsultaNotasView extends JFrame implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
         Object source = e.getSource();
-        if (source == btnConsultarEstudiante || source == btnRefrescar) {
+        if (source == btnRefrescar) {
+            cargarDatosSegunRol();
+        } else if (source == btnConsultarEstudiante) {
             if (panelSelectorAdmin.isVisible()) {
                 consultarSeleccionadoEnCombo();
             } else {

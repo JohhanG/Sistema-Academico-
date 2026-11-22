@@ -8,6 +8,7 @@ import com.sistema.modelo.InscripcionCurso;
 import com.sistema.modelo.InscripcionCursoDAO;
 import com.sistema.modelo.Usuario;
 import com.sistema.servicio.InscripcionCursoService;
+import com.sistema.servicio.IdentidadAcademicaService;
 import com.sistema.vista.InscripcionCursoView;
 
 import javax.swing.event.ListSelectionEvent;
@@ -27,6 +28,7 @@ public class InscripcionCursoController implements ActionListener {
     private final GrupoDAO grupoDAO;
     private Usuario usuarioActual;
     private Integer idEstudianteFijo;
+    private boolean estudianteSinVinculo;
 
     public InscripcionCursoController(InscripcionCursoView vista, InscripcionCursoDAO modeloDAO) {
         this(vista, new InscripcionCursoService(modeloDAO), null);
@@ -67,6 +69,12 @@ public class InscripcionCursoController implements ActionListener {
     }
 
     public void iniciar() {
+        if (usuarioActual == null || usuarioActual.getRol() == null
+                || !java.util.Set.of("ADMIN", "DOCENTE", "ESTUDIANTE").contains(
+                    usuarioActual.getRol().toUpperCase(java.util.Locale.ROOT))) {
+            vista.mostrarError("Se requiere iniciar sesion para acceder a las inscripciones.");
+            return;
+        }
         aplicarRestriccionesPorRol();
         cargarCombos();
         listarInscripciones();
@@ -97,31 +105,41 @@ public class InscripcionCursoController implements ActionListener {
     }
 
     private void resolverEstudianteDeSesion() {
-        List<Estudiante> todos = estudianteDAO.obtenerTodos();
-        if (usuarioActual.getIdEstudiante() != null) {
-            Optional<Estudiante> opt = estudianteDAO.buscarPorId(usuarioActual.getIdEstudiante());
-            if (opt.isPresent()) {
-                idEstudianteFijo = opt.get().getIdEstudiante();
-                return;
-            }
-        }
-        if (usuarioActual.getUsername() != null) {
-            String u = usuarioActual.getUsername().toLowerCase();
-            for (Estudiante e : todos) {
-                if (e.getNombre().toLowerCase().contains(u)
-                        || u.contains(e.getNombre().toLowerCase())
-                        || e.getEmail().toLowerCase().startsWith(u)) {
-                    idEstudianteFijo = e.getIdEstudiante();
-                    return;
-                }
-            }
-        }
-        if (!todos.isEmpty()) {
-            idEstudianteFijo = todos.get(0).getIdEstudiante();
+        try {
+            idEstudianteFijo = new IdentidadAcademicaService(estudianteDAO)
+                    .exigirEstudiante(usuarioActual).getIdEstudiante();
+        } catch (IllegalArgumentException e) {
+            estudianteSinVinculo = true;
+            vista.getBtnMatricular().setEnabled(false);
+            vista.mostrarError(e.getMessage());
         }
     }
 
     public void cargarCombos() {
+        if (estudianteSinVinculo) {
+            vista.getCmbEstudiante().removeAllItems();
+            vista.getCmbGrupo().removeAllItems();
+            return;
+        }
+        if (usuarioActual != null && "DOCENTE".equalsIgnoreCase(usuarioActual.getRol())) {
+            vista.getCmbEstudiante().removeAllItems();
+            vista.getCmbGrupo().removeAllItems();
+            try {
+                java.util.Set<Integer> estudiantes = new java.util.HashSet<>();
+                java.util.Set<Integer> grupos = new java.util.HashSet<>();
+                for (InscripcionCurso i : servicio.listarParaUsuario(usuarioActual)) {
+                    if (estudiantes.add(i.getIdEstudiante())) {
+                        vista.getCmbEstudiante().addItem(i.getIdEstudiante() + " - " + i.getNombreEstudiante());
+                    }
+                    if (grupos.add(i.getIdGrupo())) {
+                        vista.getCmbGrupo().addItem(i.getIdGrupo() + " - " + i.getInfoGrupo());
+                    }
+                }
+            } catch (IllegalArgumentException e) {
+                vista.mostrarError(e.getMessage());
+            }
+            return;
+        }
         try {
             vista.getCmbEstudiante().removeAllItems();
             if (idEstudianteFijo != null) {
@@ -183,12 +201,14 @@ public class InscripcionCursoController implements ActionListener {
     public void listarInscripciones() {
         DefaultTableModel modelTabla = vista.getModeloTabla();
         modelTabla.setRowCount(0);
+        if (estudianteSinVinculo) return;
 
         List<InscripcionCurso> lista;
-        if (idEstudianteFijo != null) {
-            lista = servicio.listarPorEstudiante(idEstudianteFijo);
-        } else {
-            lista = servicio.listarInscripciones();
+        try {
+            lista = servicio.listarParaUsuario(usuarioActual);
+        } catch (IllegalArgumentException e) {
+            vista.mostrarError(e.getMessage());
+            return;
         }
 
         for (InscripcionCurso item : lista) {
@@ -206,6 +226,10 @@ public class InscripcionCursoController implements ActionListener {
     }
 
     private void matricularEstudiante() {
+        if (estudianteSinVinculo) {
+            vista.mostrarError("La cuenta debe tener un estudiante asociado antes de matricular.");
+            return;
+        }
         String estSeleccionado = (String) vista.getCmbEstudiante().getSelectedItem();
         String grupoSeleccionado = (String) vista.getCmbGrupo().getSelectedItem();
 
@@ -230,7 +254,8 @@ public class InscripcionCursoController implements ActionListener {
 
         try {
             InscripcionCurso nueva = new InscripcionCurso(idEstudiante, idGrupo, nota, estado);
-            boolean exito = servicio.matricularEstudiante(nueva);
+            if (usuarioActual != null && "ESTUDIANTE".equalsIgnoreCase(usuarioActual.getRol())) nueva.setEstado("Matriculado");
+            boolean exito = servicio.matricularEstudiante(nueva, usuarioActual);
             if (exito) {
                 vista.mostrarMensaje("Asignatura matriculada exitosamente.");
                 vista.limpiarFormulario();
@@ -265,7 +290,7 @@ public class InscripcionCursoController implements ActionListener {
             modificada.setNotaFinal(nota);
             modificada.setEstado(estado);
 
-            boolean exito = servicio.actualizarCalificacion(modificada);
+            boolean exito = servicio.actualizarCalificacion(modificada, usuarioActual);
             if (exito) {
                 vista.mostrarMensaje("Calificacion guardada exitosamente.");
                 vista.limpiarFormulario();
@@ -291,7 +316,7 @@ public class InscripcionCursoController implements ActionListener {
             int id = Integer.parseInt(idStr);
             boolean confirmar = vista.confirmarAccion("Deseas cancelar la matricula con ID " + id + "?");
             if (confirmar) {
-                boolean exito = servicio.eliminarInscripcion(id);
+                boolean exito = servicio.eliminarInscripcion(id, usuarioActual);
                 if (exito) {
                     vista.mostrarMensaje("Matricula cancelada exitosamente.");
                     vista.limpiarFormulario();

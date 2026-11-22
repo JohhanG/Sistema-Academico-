@@ -15,6 +15,20 @@ import java.util.List;
 // DAO para gestionar usuarios y login en la tabla usuario
 public class UsuarioDAO {
 
+    public boolean existeVinculoEnOtraCuenta(Integer idEstudiante, Integer idDocente, int idUsuario) {
+        String sql = "SELECT 1 FROM usuario WHERE id_usuario <> ? AND "
+                + (idEstudiante != null ? "id_estudiante = ?" : "id_docente = ?");
+        Connection conn = ConexionBD.getConexion();
+        if (conn == null) throw new IllegalStateException("No se pudo verificar la asociacion de la cuenta.");
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idUsuario);
+            ps.setInt(2, idEstudiante != null ? idEstudiante : idDocente);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
+        } catch (SQLException e) {
+            throw new IllegalStateException("No se pudo verificar la asociacion de la cuenta.", e);
+        }
+    }
+
     public Usuario autenticar(String username, String passwordPlano) {
         Usuario usuario = buscarPorUsername(username);
         if (usuario == null) {

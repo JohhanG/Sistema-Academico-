@@ -2,6 +2,7 @@ package com.sistema.servicio;
 
 import com.sistema.modelo.InscripcionCurso;
 import com.sistema.modelo.InscripcionCursoDAO;
+import com.sistema.modelo.Usuario;
 
 import java.util.List;
 
@@ -41,6 +42,69 @@ public class InscripcionCursoService {
 
     public List<InscripcionCurso> listarInscripciones() {
         return inscripcionDAO.listar();
+    }
+
+    public List<InscripcionCurso> listarParaUsuario(Usuario usuario) {
+        String rol = exigirRol(usuario);
+        if (rol.equals("ADMIN")) return listarInscripciones();
+        if (rol.equals("ESTUDIANTE")) {
+            if (usuario.getIdEstudiante() == null || usuario.getIdEstudiante() <= 0) {
+                throw new IllegalArgumentException("La cuenta no tiene estudiante asociado.");
+            }
+            return listarPorEstudiante(usuario.getIdEstudiante());
+        }
+        if (usuario.getIdDocente() == null || usuario.getIdDocente() <= 0) {
+            throw new IllegalArgumentException("La cuenta no tiene docente asociado.");
+        }
+        return inscripcionDAO.listarPorDocente(usuario.getIdDocente());
+    }
+
+    public boolean actualizarCalificacion(InscripcionCurso inscripcion, Usuario usuario) {
+        String rol = exigirRol(usuario);
+        if (rol.equals("ADMIN")) return actualizarCalificacion(inscripcion);
+        if (!rol.equals("DOCENTE") || usuario.getIdDocente() == null || usuario.getIdDocente() <= 0) {
+            throw new IllegalArgumentException("Solo un docente vinculado puede calificar sus grupos.");
+        }
+        if (inscripcion == null || inscripcion.getIdInscripcion() <= 0) {
+            throw new IllegalArgumentException("El ID de inscripcion no es valido.");
+        }
+        validarNotaYEstado(inscripcion);
+        // La pertenencia se comprueba en el mismo UPDATE para evitar cambios de grupo entre consulta y guardado.
+        if (!inscripcionDAO.actualizarPorDocente(inscripcion, usuario.getIdDocente())) {
+            throw new IllegalArgumentException("No se pudo calificar. Verifica que la inscripcion pertenece a uno de tus grupos y que existe conexion.");
+        }
+        return true;
+    }
+
+    public boolean matricularEstudiante(InscripcionCurso inscripcion, Usuario usuario) {
+        String rol = exigirRol(usuario);
+        if (rol.equals("ADMIN")) return matricularEstudiante(inscripcion);
+        if (!rol.equals("ESTUDIANTE") || usuario.getIdEstudiante() == null
+                || inscripcion == null || usuario.getIdEstudiante() != inscripcion.getIdEstudiante()) {
+            throw new IllegalArgumentException("Solo puedes matricular al estudiante asociado a tu cuenta.");
+        }
+        if (inscripcion.getNotaFinal() != null || !"Matriculado".equals(inscripcion.getEstado())) {
+            throw new IllegalArgumentException("El estudiante no puede asignar notas ni estados de calificacion.");
+        }
+        return matricularEstudiante(inscripcion);
+    }
+
+    public boolean eliminarInscripcion(int idInscripcion, Usuario usuario) {
+        if (!exigirRol(usuario).equals("ADMIN")) {
+            throw new IllegalArgumentException("Solo el administrador puede eliminar inscripciones.");
+        }
+        return eliminarInscripcion(idInscripcion);
+    }
+
+    private String exigirRol(Usuario usuario) {
+        if (usuario == null || usuario.getRol() == null) {
+            throw new IllegalArgumentException("Se requiere una sesion valida.");
+        }
+        String rol = usuario.getRol().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!rol.equals("ADMIN") && !rol.equals("DOCENTE") && !rol.equals("ESTUDIANTE")) {
+            throw new IllegalArgumentException("El rol no tiene acceso a las inscripciones.");
+        }
+        return rol;
     }
 
     public List<InscripcionCurso> listarPorEstudiante(int idEstudiante) {
