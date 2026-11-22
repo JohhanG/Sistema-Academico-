@@ -17,6 +17,8 @@ public class UsuarioView extends JFrame {
     private JTextField txtUsername;
     private JPasswordField txtPassword;
     private JComboBox<String> cmbRol;
+    private JComboBox<String> cmbEstudiante;
+    private JComboBox<String> cmbDocente;
 
     private JButton btnGuardar;
     private JButton btnActualizar;
@@ -120,6 +122,20 @@ public class UsuarioView extends JFrame {
         cmbRol = new JComboBox<>(new String[]{"ADMIN", "DOCENTE", "ESTUDIANTE"});
         panelFormulario.add(cmbRol, gbc);
 
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        panelFormulario.add(new JLabel("Estudiante:"), gbc);
+        gbc.gridx = 1;
+        cmbEstudiante = new JComboBox<>();
+        panelFormulario.add(cmbEstudiante, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 5;
+        panelFormulario.add(new JLabel("Docente:"), gbc);
+        gbc.gridx = 1;
+        cmbDocente = new JComboBox<>();
+        panelFormulario.add(cmbDocente, gbc);
+
         panelIzquierdo.add(panelFormulario, BorderLayout.NORTH);
 
         JPanel panelBotones = new JPanel(new GridLayout(6, 1, 8, 8));
@@ -215,6 +231,8 @@ public class UsuarioView extends JFrame {
     public JTextField getTxtUsername() { return txtUsername; }
     public JPasswordField getTxtPassword() { return txtPassword; }
     public JComboBox<String> getCmbRol() { return cmbRol; }
+    public JComboBox<String> getCmbEstudiante() {return cmbEstudiante;}
+    public JComboBox<String> getCmbDocente() {return cmbDocente;}
     public JButton getBtnGuardar() { return btnGuardar; }
     public JButton getBtnActualizar() { return btnActualizar; }
     public JButton getBtnEliminar() { return btnEliminar; }
