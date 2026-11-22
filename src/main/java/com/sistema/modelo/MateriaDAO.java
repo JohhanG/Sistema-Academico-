@@ -34,7 +34,7 @@ public class MateriaDAO {
                 return true;
             }
         } catch (SQLException e) {
-            System.err.println("Error al insertar materia: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return false;
     }
@@ -58,7 +58,7 @@ public class MateriaDAO {
                 lista.add(mat);
             }
         } catch (SQLException e) {
-            System.err.println("Error al listar materias: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return lista;
     }
@@ -76,13 +76,12 @@ public class MateriaDAO {
             ps.setInt(3, materia.getIdMateria());
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error al actualizar materia: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     public boolean eliminar(int idMateria) {
-        String sql = "DELETE FROM materia WHERE id_materia = ?";
+        String sql = "DELETE FROM materia WHERE id_materia = ? AND NOT EXISTS (SELECT 1 FROM grupo d WHERE d.id_materia = materia.id_materia)";
         Connection conn = ConexionBD.getConexion();
         if (conn == null) {
             return false;
@@ -90,11 +89,11 @@ public class MateriaDAO {
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idMateria);
-            return ps.executeUpdate() > 0;
+            if (ps.executeUpdate() == 0) throw new IllegalArgumentException("No se puede eliminar: el registro no existe o tiene informacion academica asociada.");
+            return true;
         } catch (SQLException e) {
-            System.err.println("Error al eliminar materia: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     public Materia buscarPorId(int idMateria) {
@@ -116,7 +115,7 @@ public class MateriaDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error al buscar materia: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return null;
     }

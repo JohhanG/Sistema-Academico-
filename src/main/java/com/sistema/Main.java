@@ -11,6 +11,10 @@ import javax.swing.UIManager;
 public class Main {
 
     public static void main(String[] args) {
+        if (java.util.Arrays.asList(args).contains("--consola")) {
+            com.sistema.vista.ConsolaAcademica.main(args);
+            return;
+        }
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {

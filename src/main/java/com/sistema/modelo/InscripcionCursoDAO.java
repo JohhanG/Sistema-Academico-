@@ -44,7 +44,7 @@ public class InscripcionCursoDAO {
                 return true;
             }
         } catch (SQLException e) {
-            System.err.println("Error al matricular estudiante: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return false;
     }
@@ -73,7 +73,7 @@ public class InscripcionCursoDAO {
                 lista.add(mapearDetalle(rs));
             }
         } catch (SQLException e) {
-            System.err.println("Error al listar inscripciones: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return lista;
     }
@@ -114,7 +114,7 @@ public class InscripcionCursoDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error al listar notas del estudiante: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return lista;
     }
@@ -151,7 +151,7 @@ public class InscripcionCursoDAO {
     }
 
     private boolean actualizarCalificacion(InscripcionCurso inscripcion, Integer idDocente) {
-        String sql = "UPDATE inscripcion_curso SET nota_final = ?, estado = ? WHERE id_inscripcion = ?"
+        String sql = "UPDATE inscripcion_curso SET nota_final = ?, estado = ? WHERE id_inscripcion = ? AND estado <> 'Cancelado'"
                 + (idDocente == null ? "" : " AND EXISTS (SELECT 1 FROM grupo g WHERE "
                 + "g.id_grupo = inscripcion_curso.id_grupo AND g.id_docente = ?)");
         Connection conn = ConexionBD.getConexion();
@@ -171,13 +171,12 @@ public class InscripcionCursoDAO {
             if (idDocente != null) ps.setInt(4, idDocente);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error al actualizar inscripcion: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     public boolean eliminar(int idInscripcion) {
-        String sql = "DELETE FROM inscripcion_curso WHERE id_inscripcion = ?";
+        String sql = "UPDATE inscripcion_curso SET estado = 'Cancelado' WHERE id_inscripcion = ? AND estado <> 'Cancelado'";
         Connection conn = ConexionBD.getConexion();
         if (conn == null) {
             return false;
@@ -187,9 +186,8 @@ public class InscripcionCursoDAO {
             ps.setInt(1, idInscripcion);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error al eliminar inscripcion: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     public boolean existeMatricula(int idEstudiante, int idGrupo) {
@@ -206,9 +204,8 @@ public class InscripcionCursoDAO {
                 return rs.next();
             }
         } catch (SQLException e) {
-            System.err.println("Error al verificar matricula: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     // Procedimiento almacenado 1: obtiene estudiantes para el combobox
@@ -219,14 +216,12 @@ public class InscripcionCursoDAO {
             return items;
         }
 
-        try (CallableStatement cs = conn.prepareCall("{call sp_combos_estudiantes()}");
+        try (PreparedStatement cs = conn.prepareStatement("SELECT id_estudiante || ' - ' || nombre || ' ' || apellido AS descripcion FROM estudiante ORDER BY id_estudiante");
              ResultSet rs = cs.executeQuery()) {
             while (rs.next()) {
                 items.add(rs.getString("descripcion"));
             }
-        } catch (SQLException e) {
-            // Si el procedimiento no existe aun, el controlador usa la lista normal
-        }
+        } catch (SQLException e) { throw com.sistema.config.ErrorDatos.desde(e); }
         return items;
     }
 
@@ -238,14 +233,12 @@ public class InscripcionCursoDAO {
             return items;
         }
 
-        try (CallableStatement cs = conn.prepareCall("{call sp_combos_grupos()}");
+        try (PreparedStatement cs = conn.prepareStatement("SELECT g.id_grupo || ' - ' || m.nombre_materia || ' | ' || g.aula AS descripcion FROM grupo g JOIN materia m ON m.id_materia=g.id_materia ORDER BY g.id_grupo");
              ResultSet rs = cs.executeQuery()) {
             while (rs.next()) {
                 items.add(rs.getString("descripcion"));
             }
-        } catch (SQLException e) {
-            // Si el procedimiento no existe aun, el controlador usa la lista normal
-        }
+        } catch (SQLException e) { throw com.sistema.config.ErrorDatos.desde(e); }
         return items;
     }
 }

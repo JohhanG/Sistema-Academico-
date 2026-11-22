@@ -1,4 +1,5 @@
 package com.sistema.controlador;
+import com.sistema.vista.TrabajoUI;
 
 import com.sistema.modelo.Estudiante;
 import com.sistema.modelo.EstudianteDao;
@@ -74,6 +75,7 @@ public class EstudianteController implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (TrabajoUI.ocupado(vista)) return;
         if (vista == null) return;
         Object source = e.getSource();
 
@@ -87,25 +89,16 @@ public class EstudianteController implements ActionListener {
             vista.limpiarFormulario();
         } else if (source == vista.getBtnRefrescar()) {
             listarEstudiantesEnTabla();
-            vista.mostrarMensaje("Lista de estudiantes actualizada.");
+
         }
     }
 
     public void listarEstudiantesEnTabla() {
-        if (vista == null) return;
-        DefaultTableModel modelTabla = vista.getModeloTabla();
-        modelTabla.setRowCount(0);
-
-        List<Estudiante> lista = obtenerTodosLosEstudiantes();
-        for (Estudiante est : lista) {
-            Object[] fila = {
-                    est.getIdEstudiante(),
-                    est.getNombre(),
-                    est.getApellido(),
-                    est.getEmail()
-            };
-            modelTabla.addRow(fila);
-        }
+        if (vista==null) return;
+        vista.getModeloTabla().setRowCount(0);
+        TrabajoUI.ejecutar(vista, this::obtenerTodosLosEstudiantes, lista -> {
+            for (Estudiante e:lista) vista.getModeloTabla().addRow(new Object[]{e.getIdEstudiante(),e.getNombre(),e.getApellido(),e.getEmail()});
+        },vista::mostrarError);
     }
 
     private void ejecutarRegistroDesdeVista() {
@@ -114,10 +107,9 @@ public class EstudianteController implements ActionListener {
         String email = vista.getTxtEmail().getText().trim();
 
         try {
-            registrarEstudiante(nombre, apellido, email);
-            vista.mostrarMensaje("Estudiante registrado exitosamente.");
-            vista.limpiarFormulario();
-            listarEstudiantesEnTabla();
+            TrabajoUI.ejecutar(vista, () -> { registrarEstudiante(nombre, apellido, email); return true; }, resultado -> {
+                vista.mostrarMensaje("Estudiante registrado exitosamente."); vista.limpiarFormulario(); listarEstudiantesEnTabla();
+            },vista::mostrarError);
         } catch (IllegalArgumentException ex) {
             vista.mostrarError(ex.getMessage());
         } catch (Exception ex) {
@@ -138,10 +130,9 @@ public class EstudianteController implements ActionListener {
 
         try {
             int id = Integer.parseInt(idStr);
-            actualizarEstudiante(id, nombre, apellido, email);
-            vista.mostrarMensaje("Estudiante actualizado exitosamente.");
-            vista.limpiarFormulario();
-            listarEstudiantesEnTabla();
+            TrabajoUI.ejecutar(vista, () -> { actualizarEstudiante(id, nombre, apellido, email); return true; }, resultado -> {
+                vista.mostrarMensaje("Estudiante actualizado exitosamente."); vista.limpiarFormulario(); listarEstudiantesEnTabla();
+            },vista::mostrarError);
         } catch (NumberFormatException ex) {
             vista.mostrarError("ID de estudiante invalido.");
         } catch (IllegalArgumentException ex) {
@@ -162,10 +153,9 @@ public class EstudianteController implements ActionListener {
             int id = Integer.parseInt(idStr);
             boolean confirmar = vista.confirmarAccion("Deseas eliminar el estudiante con ID " + id + "?");
             if (confirmar) {
-                eliminarEstudiante(id);
-                vista.mostrarMensaje("Estudiante eliminado exitosamente.");
-                vista.limpiarFormulario();
-                listarEstudiantesEnTabla();
+                TrabajoUI.ejecutar(vista, () -> { eliminarEstudiante(id); return true; }, resultado -> {
+                vista.mostrarMensaje("Estudiante eliminado exitosamente."); vista.limpiarFormulario(); listarEstudiantesEnTabla();
+            },vista::mostrarError);
             }
         } catch (NumberFormatException ex) {
             vista.mostrarError("ID de estudiante invalido.");

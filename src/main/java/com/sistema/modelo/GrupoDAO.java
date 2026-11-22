@@ -87,14 +87,15 @@ public class GrupoDAO {
     }
 
     public boolean eliminar(int idGrupo) throws SQLException {
-        String sql = "DELETE FROM grupo WHERE id_grupo = ?";
+        String sql = "DELETE FROM grupo WHERE id_grupo = ? AND NOT EXISTS (SELECT 1 FROM inscripcion_curso d WHERE d.id_grupo = grupo.id_grupo)";
         Connection con = ConexionBD.getConexion();
         if (con == null) {
             return false;
         }
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idGrupo);
-            return ps.executeUpdate() > 0;
+            if (ps.executeUpdate() == 0) throw new IllegalArgumentException("No se puede eliminar: el registro no existe o tiene informacion academica asociada.");
+            return true;
         }
     }
 
@@ -106,14 +107,12 @@ public class GrupoDAO {
             return items;
         }
 
-        try (CallableStatement cs = con.prepareCall("{call sp_combos_materias()}");
+        try (PreparedStatement cs = con.prepareStatement("SELECT id_materia || ' - ' || nombre_materia AS descripcion FROM materia ORDER BY id_materia");
              ResultSet rs = cs.executeQuery()) {
             while (rs.next()) {
                 items.add(rs.getString("descripcion"));
             }
-        } catch (SQLException e) {
-            // Si no existe el procedimiento en la BD se usa el listado normal
-        }
+        } catch (SQLException e) { throw com.sistema.config.ErrorDatos.desde(e); }
         return items;
     }
 
@@ -125,14 +124,12 @@ public class GrupoDAO {
             return items;
         }
 
-        try (CallableStatement cs = con.prepareCall("{call sp_combos_docentes()}");
+        try (PreparedStatement cs = con.prepareStatement("SELECT id_docente || ' - ' || nombre AS descripcion FROM docente ORDER BY id_docente");
              ResultSet rs = cs.executeQuery()) {
             while (rs.next()) {
                 items.add(rs.getString("descripcion"));
             }
-        } catch (SQLException e) {
-            // Si no existe el procedimiento en la BD se usa el listado normal
-        }
+        } catch (SQLException e) { throw com.sistema.config.ErrorDatos.desde(e); }
         return items;
     }
 

@@ -63,6 +63,8 @@ public class DocenteService {
         if (docente.getNombre() == null || docente.getNombre().trim().isEmpty()) {
             throw new IllegalArgumentException("El nombre del docente es obligatorio.");
         }
+        docente.setNombre(Validaciones.texto(docente.getNombre(),"El nombre del docente",100));
+        docente.setEspecialidad(Validaciones.texto(docente.getEspecialidad(),"La especialidad",100));
         if (docente.getEspecialidad() == null || docente.getEspecialidad().trim().isEmpty()) {
             throw new IllegalArgumentException("La especialidad del docente es obligatoria.");
         }

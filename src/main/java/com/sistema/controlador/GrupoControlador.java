@@ -1,4 +1,5 @@
 package com.sistema.controlador;
+import com.sistema.vista.TrabajoUI;
 
 import com.sistema.modelo.Docente;
 import com.sistema.modelo.DocenteDAO;
@@ -73,34 +74,16 @@ public class GrupoControlador implements ActionListener {
 
     // Llena los combobox de Materia y Docente usando procedimientos almacenados
     public void cargarCombos() {
-        if (vista == null) return;
-        vista.getCmbMateria().removeAllItems();
-        List<String> materiasSp = servicio.obtenerComboMaterias();
-        if (!materiasSp.isEmpty()) {
-            for (String item : materiasSp) {
-                vista.getCmbMateria().addItem(item);
-            }
-        } else {
-            for (Materia m : new MateriaDAO().listar()) {
-                vista.getCmbMateria().addItem(m.getIdMateria() + " - " + m.getNombreMateria());
-            }
-        }
-
-        vista.getCmbDocente().removeAllItems();
-        List<String> docentesSp = servicio.obtenerComboDocentes();
-        if (!docentesSp.isEmpty()) {
-            for (String item : docentesSp) {
-                vista.getCmbDocente().addItem(item);
-            }
-        } else {
-            for (Docente d : new DocenteDAO().listar()) {
-                vista.getCmbDocente().addItem(d.getIdDocente() + " - " + d.getNombre());
-            }
-        }
+        if (vista==null) return;
+        TrabajoUI.ejecutar(vista, () -> java.util.List.of(servicio.obtenerComboMaterias(),servicio.obtenerComboDocentes()), datos -> {
+            vista.getCmbMateria().removeAllItems(); vista.getCmbDocente().removeAllItems();
+            datos.get(0).forEach(vista.getCmbMateria()::addItem); datos.get(1).forEach(vista.getCmbDocente()::addItem);
+        },vista::mostrarError);
     }
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (TrabajoUI.ocupado(vista)) return;
         if (vista == null) return;
         Object source = e.getSource();
         if (source == vista.getBtnGuardar()) {
@@ -114,27 +97,16 @@ public class GrupoControlador implements ActionListener {
         } else if (source == vista.getBtnRefrescar()) {
             cargarCombos();
             listarGruposEnTabla();
-            vista.mostrarMensaje("Lista de grupos actualizada.");
+
         }
     }
 
     public void listarGruposEnTabla() {
-        if (vista == null) return;
-        DefaultTableModel model = vista.getModeloTabla();
-        model.setRowCount(0);
-        try {
-            for (Grupo g : listarGrupos()) {
-                model.addRow(new Object[]{
-                        g.getIdGrupo(),
-                        g.getIdMateria(),
-                        g.getIdDocente(),
-                        g.getAula(),
-                        g.getHorario()
-                });
-            }
-        } catch (SQLException ex) {
-            vista.mostrarError("Error al listar grupos: " + ex.getMessage());
-        }
+        if (vista==null) return;
+        vista.getModeloTabla().setRowCount(0);
+        TrabajoUI.ejecutar(vista, this::listarGrupos, grupos -> {
+            for (Grupo g:grupos) vista.getModeloTabla().addRow(new Object[]{g.getIdGrupo(),g.getIdMateria(),g.getIdDocente(),g.getAula(),g.getHorario()});
+        },vista::mostrarError);
     }
 
     private void guardarDesdeVista() {
@@ -150,7 +122,7 @@ public class GrupoControlador implements ActionListener {
             String aula = vista.getTxtAula().getText().trim();
             String horario = vista.getTxtHorario().getText().trim();
 
-            int id = crearGrupo(idMateria, idDocente, aula, horario);
+TrabajoUI.ejecutar(vista, () -> crearGrupo(idMateria, idDocente, aula, horario), id -> {
             if (id > 0) {
                 vista.mostrarMensaje("Grupo creado exitosamente.");
                 vista.limpiarFormulario();
@@ -158,7 +130,8 @@ public class GrupoControlador implements ActionListener {
             } else {
                 vista.mostrarError("No se pudo crear el grupo.");
             }
-        } catch (IllegalArgumentException | SQLException ex) {
+            },vista::mostrarError);
+        } catch (IllegalArgumentException ex) {
             vista.mostrarError(ex.getMessage());
         }
     }
@@ -183,14 +156,16 @@ public class GrupoControlador implements ActionListener {
             String horario = vista.getTxtHorario().getText().trim();
 
             Grupo grupo = new Grupo(idGrupo, idMateria, idDocente, aula, horario);
-            if (actualizarGrupo(grupo)) {
+            TrabajoUI.ejecutar(vista, () -> actualizarGrupo(grupo), exito -> {
+            if (exito) {
                 vista.mostrarMensaje("Grupo actualizado exitosamente.");
                 vista.limpiarFormulario();
                 listarGruposEnTabla();
             } else {
                 vista.mostrarError("No se pudo actualizar el grupo.");
             }
-        } catch (IllegalArgumentException | SQLException ex) {
+            },vista::mostrarError);
+        } catch (IllegalArgumentException ex) {
             vista.mostrarError(ex.getMessage());
         }
     }
@@ -204,15 +179,17 @@ public class GrupoControlador implements ActionListener {
         try {
             int idGrupo = Integer.parseInt(idStr);
             if (vista.confirmarAccion("Deseas eliminar el grupo con ID " + idGrupo + "?")) {
-                if (eliminarGrupo(idGrupo)) {
+                TrabajoUI.ejecutar(vista, () -> eliminarGrupo(idGrupo), exito -> {
+            if (exito) {
                     vista.mostrarMensaje("Grupo eliminado exitosamente.");
                     vista.limpiarFormulario();
                     listarGruposEnTabla();
                 } else {
                     vista.mostrarError("No se pudo eliminar el grupo.");
                 }
+            },vista::mostrarError);
             }
-        } catch (IllegalArgumentException | SQLException ex) {
+        } catch (IllegalArgumentException ex) {
             vista.mostrarError(ex.getMessage());
         }
     }

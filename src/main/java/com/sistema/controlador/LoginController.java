@@ -1,6 +1,7 @@
 package com.sistema.controlador;
 
 import com.sistema.modelo.Usuario;
+import com.sistema.vista.TrabajoUI;
 import com.sistema.modelo.UsuarioDAO;
 import com.sistema.servicio.UsuarioService;
 import com.sistema.vista.LoginView;
@@ -43,6 +44,7 @@ public class LoginController implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (TrabajoUI.ocupado(vista)) return;
         Object source = e.getSource();
         if (source == vista.getBtnIngresar()) {
             procesarLogin();
@@ -55,21 +57,10 @@ public class LoginController implements ActionListener {
         String username = vista.getTxtUsername().getText().trim();
         String password = new String(vista.getTxtPassword().getPassword());
 
-        try {
-            Usuario usuarioAutenticado = servicio.autenticar(username, password);
-            if (usuarioAutenticado != null) {
-                vista.mostrarMensaje("Bienvenido " + usuarioAutenticado.getUsername()
-                        + " (Rol: " + usuarioAutenticado.getRol() + ")");
-                vista.dispose();
-                MenuPrincipalView menu = new MenuPrincipalView(usuarioAutenticado);
-                menu.setVisible(true);
-            } else {
-                vista.mostrarError("Usuario o contrasena incorrectos.");
-            }
-        } catch (IllegalArgumentException ex) {
-            vista.mostrarError(ex.getMessage());
-        } catch (Exception ex) {
-            vista.mostrarError("Error al iniciar sesion: " + ex.getMessage());
-        }
+        TrabajoUI.ejecutar(vista, () -> servicio.autenticar(username,password), usuarioAutenticado -> {
+            if (usuarioAutenticado == null) { vista.mostrarError("Usuario o contrasena incorrectos."); return; }
+            vista.dispose();
+            new MenuPrincipalView(usuarioAutenticado).setVisible(true);
+        }, vista::mostrarError);
     }
 }

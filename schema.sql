@@ -1,3 +1,4 @@
+BEGIN;
 -- ==========================================================
 -- SISTEMA ACADÉMICO - MODELO DE BASE DE DATOS (SUPABASE / POSTGRESQL)
 -- Basado en el diagrama de clases del profesor
@@ -8,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS materia (
     id_materia SERIAL PRIMARY KEY,
     nombre_materia VARCHAR(100) NOT NULL,
-    creditos INT NOT NULL CHECK (creditos > 0)
+    creditos INT NOT NULL CHECK (creditos BETWEEN 1 AND 10)
 );
 
 -- 2. Tabla: Docente
@@ -30,7 +31,7 @@ CREATE TABLE IF NOT EXISTS estudiante (
 -- Relaciona Docente y Materia (Aula y Horario)
 CREATE TABLE IF NOT EXISTS grupo (
     id_grupo SERIAL PRIMARY KEY,
-    id_materia INT NOT NULL REFERENCES materia(id_materia) ON DELETE CASCADE,
+    id_materia INT NOT NULL REFERENCES materia(id_materia) ON DELETE RESTRICT,
     id_docente INT NOT NULL REFERENCES docente(id_docente) ON DELETE RESTRICT,
     aula VARCHAR(50) NOT NULL,
     horario VARCHAR(100) NOT NULL
@@ -40,8 +41,8 @@ CREATE TABLE IF NOT EXISTS grupo (
 -- Relaciona Estudiante y Grupo
 CREATE TABLE IF NOT EXISTS inscripcion_curso (
     id_inscripcion SERIAL PRIMARY KEY,
-    id_estudiante INT NOT NULL REFERENCES estudiante(id_estudiante) ON DELETE CASCADE,
-    id_grupo INT NOT NULL REFERENCES grupo(id_grupo) ON DELETE CASCADE,
+    id_estudiante INT NOT NULL REFERENCES estudiante(id_estudiante) ON DELETE RESTRICT,
+    id_grupo INT NOT NULL REFERENCES grupo(id_grupo) ON DELETE RESTRICT,
     nota_final NUMERIC(3, 1) CHECK (nota_final >= 0.0 AND nota_final <= 5.0),
     estado VARCHAR(30) NOT NULL DEFAULT 'Matriculado' CHECK (estado IN ('Matriculado', 'Aprobado', 'Reprobado', 'Cancelado')),
     CONSTRAINT uq_estudiante_grupo UNIQUE (id_estudiante, id_grupo)
@@ -53,8 +54,8 @@ CREATE TABLE IF NOT EXISTS usuario (
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     rol VARCHAR(20) NOT NULL CHECK (rol IN ('ADMIN', 'DOCENTE', 'ESTUDIANTE')),
-    id_estudiante INT UNIQUE REFERENCES estudiante(id_estudiante) ON DELETE CASCADE,
-    id_docente INT UNIQUE REFERENCES docente(id_docente) ON DELETE CASCADE,
+    id_estudiante INT UNIQUE REFERENCES estudiante(id_estudiante) ON DELETE RESTRICT,
+    id_docente INT UNIQUE REFERENCES docente(id_docente) ON DELETE RESTRICT,
     fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -120,49 +121,6 @@ BEGIN
 END;
 $$;
 
--- ==========================================================
--- DATOS DE PRUEBA INICIALES (SEMILLAS)
--- ==========================================================
 
--- Insertar Materias
-INSERT INTO materia (nombre_materia, creditos) VALUES
-('Programación II', 4),
-('Bases de Datos II', 3),
-('Estructura de Datos', 4)
-ON CONFLICT DO NOTHING;
-
--- Insertar Docentes
-INSERT INTO docente (nombre, especialidad) VALUES
-('Carlos Gómez', 'Ingeniería de Software'),
-('Marta Rodríguez', 'Gestión de Bases de Datos')
-ON CONFLICT DO NOTHING;
-
--- Insertar Estudiantes
-INSERT INTO estudiante (nombre, apellido, email) VALUES
-('Johhan', 'González', 'johhan@universidad.edu.co'),
-('Andrés', 'Pérez', 'andres@universidad.edu.co'),
-('Valentina', 'López', 'valentina@universidad.edu.co')
-ON CONFLICT (email) DO NOTHING;
-
--- Insertar Grupos
-INSERT INTO grupo (id_materia, id_docente, aula, horario) VALUES
-(1, 1, 'Laboratorio 301', 'Lunes y Miércoles 08:00 - 10:00'),
-(2, 2, 'Aula 204', 'Martes y Jueves 10:00 - 12:00')
-ON CONFLICT DO NOTHING;
-
--- Insertar Inscripciones
-INSERT INTO inscripcion_curso (id_estudiante, id_grupo, nota_final, estado) VALUES
-(1, 1, 4.5, 'Aprobado'),
-(2, 1, 3.8, 'Aprobado'),
-(3, 2, NULL, 'Matriculado')
-ON CONFLICT (id_estudiante, id_grupo) DO NOTHING;
-
--- Insertar Usuarios / Roles (Contraseñas con Hash SHA-512)
--- admin -> admin123
--- cgomez -> docente123
--- johhang -> estudiante123
-INSERT INTO usuario (username, password, rol, id_estudiante, id_docente) VALUES
-('admin', '7fcf4ba391c48784edde599889d6e3f1e47a27db36ecc050cc92f259bfac38afad2c68a1ae804d77075e8fb722503f3eca2b2c1006ee6f6c7b7628cb45fffd1d', 'ADMIN', NULL, NULL),
-('cgomez', 'c4f9375f9834b4e7f0a528cc65c055702bfd52242e81b6fd650c7402a5b69a2c5f80a1d84e84c5749d80e088f285e7075fb26a19c530e77e6f56a0e68d801bf1', 'DOCENTE', NULL, 1),
-('johhang', 'a62f2225bf70bfaccbc7f1ef2a397836717377deef90b8e3e9150250908a6f86bc7072009b4c41802f74b2b6a48e589b100ef5928c7b7d517c21b20e9b938f7c', 'ESTUDIANTE', 1, NULL)
-ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_estudiante_email_normalizado ON estudiante (LOWER(email));
+COMMIT;

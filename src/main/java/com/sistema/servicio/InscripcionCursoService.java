@@ -69,6 +69,9 @@ public class InscripcionCursoService {
             throw new IllegalArgumentException("El ID de inscripcion no es valido.");
         }
         validarNotaYEstado(inscripcion);
+        if ("Cancelado".equals(inscripcion.getEstado())) {
+            throw new IllegalArgumentException("Solo el administrador puede cancelar matriculas.");
+        }
         // La pertenencia se comprueba en el mismo UPDATE para evitar cambios de grupo entre consulta y guardado.
         if (!inscripcionDAO.actualizarPorDocente(inscripcion, usuario.getIdDocente())) {
             throw new IllegalArgumentException("No se pudo calificar. Verifica que la inscripcion pertenece a uno de tus grupos y que existe conexion.");
@@ -140,11 +143,15 @@ public class InscripcionCursoService {
     private void validarNotaYEstado(InscripcionCurso inscripcion) {
         Double nota = inscripcion.getNotaFinal();
         if (nota != null) {
-            if (nota < 0.0 || nota > 5.0) {
+            if (!Double.isFinite(nota) || nota < 0.0 || nota > 5.0) {
                 throw new IllegalArgumentException("La nota final debe estar entre 0.0 y 5.0.");
             }
         }
 
+        if (nota != null) {
+            nota = java.math.BigDecimal.valueOf(nota).setScale(1, java.math.RoundingMode.HALF_UP).doubleValue();
+            inscripcion.setNotaFinal(nota);
+        }
         String estado = inscripcion.getEstado();
         if (estado == null || estado.trim().isEmpty()) {
             estado = "Matriculado";
@@ -157,6 +164,9 @@ public class InscripcionCursoService {
             throw new IllegalArgumentException("El estado de matricula no es valido.");
         }
 
+        if (nota == null && (estado.equals("Aprobado") || estado.equals("Reprobado"))) {
+            throw new IllegalArgumentException("Una matricula aprobada o reprobada debe tener nota.");
+        }
         if (nota != null && !estado.equals("Cancelado")) {
             if (nota >= 3.0) {
                 estado = "Aprobado";

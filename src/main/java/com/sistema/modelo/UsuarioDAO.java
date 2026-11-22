@@ -55,7 +55,7 @@ public class UsuarioDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error al buscar usuario: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return null;
     }
@@ -75,7 +75,7 @@ public class UsuarioDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error al buscar usuario por ID: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return null;
     }
@@ -89,7 +89,7 @@ public class UsuarioDAO {
 
         String passwordHash = usuario.getPassword();
         if (!SeguridadUtil.esHashValido(passwordHash)) {
-            passwordHash = SeguridadUtil.hashSHA512(passwordHash);
+            passwordHash = SeguridadUtil.hashPassword(passwordHash);
             usuario.setPassword(passwordHash);
         }
 
@@ -118,7 +118,7 @@ public class UsuarioDAO {
                 return true;
             }
         } catch (SQLException e) {
-            System.err.println("Error al insertar usuario: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return false;
     }
@@ -137,7 +137,7 @@ public class UsuarioDAO {
                 lista.add(mapear(rs));
             }
         } catch (SQLException e) {
-            System.err.println("Error al listar usuarios: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
         return lista;
     }
@@ -151,7 +151,7 @@ public class UsuarioDAO {
 
         String passwordHash = usuario.getPassword();
         if (!SeguridadUtil.esHashValido(passwordHash)) {
-            passwordHash = SeguridadUtil.hashSHA512(passwordHash);
+            passwordHash = SeguridadUtil.hashPassword(passwordHash);
             usuario.setPassword(passwordHash);
         }
 
@@ -173,9 +173,8 @@ public class UsuarioDAO {
 
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error al actualizar usuario: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     public boolean eliminar(int idUsuario) {
@@ -189,9 +188,8 @@ public class UsuarioDAO {
             ps.setInt(1, idUsuario);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error al eliminar usuario: " + e.getMessage());
+            throw com.sistema.config.ErrorDatos.desde(e);
         }
-        return false;
     }
 
     private Usuario mapear(ResultSet rs) throws SQLException {

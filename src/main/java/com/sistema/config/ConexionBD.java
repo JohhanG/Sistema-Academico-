@@ -1,98 +1,67 @@
 package com.sistema.config;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 
-// Clase Singleton para conectar a PostgreSQL (Supabase) usando config.properties
-public class ConexionBD {
+/** Configuracion sin secretos predeterminados. Las tareas JDBC de Swing se serializan. */
+public final class ConexionBD {
+    private static Connection conexion;
+    private ConexionBD() { }
 
-    private static final String CONFIG_FILE = "config.properties";
-
-    private static final String DEFAULT_HOST = "db.qwtdiaeruuxshrmxsaoo.supabase.co";
-    private static final String DEFAULT_PUERTO = "5432";
-    private static final String DEFAULT_BD = "postgres";
-    private static final String DEFAULT_USUARIO = "postgres";
-    private static final String DEFAULT_PASSWORD = "heidyexpone1";
-
-    private static Connection conexion = null;
-
-    private ConexionBD() {
-    }
-
-    // Lee los datos del archivo config.properties
     public static Properties cargarPropiedades() {
         Properties props = new Properties();
-        File archivo = new File(CONFIG_FILE);
-        if (archivo.exists()) {
-            try (FileInputStream fis = new FileInputStream(archivo)) {
-                props.load(fis);
-            } catch (IOException e) {
-                System.err.println("No se pudo leer config.properties: " + e.getMessage());
+        Path base = Path.of(System.getProperty("sistema.config.dir", "."));
+        for (String nombre : new String[]{"config.properties", "config.local.properties"}) {
+            Path archivo = base.resolve(nombre);
+            if (Files.exists(archivo)) {
+                try (InputStream entrada = Files.newInputStream(archivo)) { props.load(entrada); }
+                catch (IOException e) { throw new ErrorDatos("No se pudo leer la configuracion de la base de datos.", e); }
             }
+        }
+        for (String[] par : new String[][]{{"DB_URL","URL"},{"DB_USER","USER"},{"DB_PASSWORD","PASSWORD"}}) {
+            String valor = System.getenv(par[0]);
+            if (valor != null) props.setProperty(par[1],valor);
         }
         return props;
     }
 
-    // Devuelve la conexion activa a la base de datos
-    public static Connection getConexion() {
+    public static synchronized Connection getConexion() {
         try {
             if (conexion == null || conexion.isClosed()) {
-                Class.forName("org.postgresql.Driver");
-
-                Properties props = cargarPropiedades();
-                String url = props.getProperty("URL", props.getProperty("db.url", "")).trim();
-                if (url.isEmpty()) {
-                    String host = props.getProperty("HOST", DEFAULT_HOST).trim();
-                    String port = props.getProperty("PORT", DEFAULT_PUERTO).trim();
-                    String db = props.getProperty("DB", DEFAULT_BD).trim();
-                    url = "jdbc:postgresql://" + host + ":" + port + "/" + db + "?sslmode=require";
+                Properties p = cargarPropiedades();
+                String url = p.getProperty("URL",p.getProperty("db.url","")).trim();
+                String usuario = p.getProperty("USER",p.getProperty("db.user","")).trim();
+                String password = p.getProperty("PASSWORD",p.getProperty("db.password",""));
+                if (!url.startsWith("jdbc:postgresql://") || usuario.isBlank() || password.isEmpty()) {
+                    throw new ErrorDatos("Configura URL, USER y PASSWORD en config.local.properties o en DB_URL, DB_USER y DB_PASSWORD.");
                 }
-
-                String usuario = props.getProperty("USER", props.getProperty("db.user", DEFAULT_USUARIO)).trim();
-                if (usuario.isEmpty()) {
-                    usuario = DEFAULT_USUARIO;
-                }
-
-                String password = props.getProperty("PASSWORD", props.getProperty("db.password", DEFAULT_PASSWORD)).trim();
-                if (password.isEmpty()) {
-                    password = DEFAULT_PASSWORD;
-                }
-
-                conexion = DriverManager.getConnection(url, usuario, password);
-                System.out.println("Conectado exitosamente a la base de datos.");
+                Properties jdbc = new Properties();
+                jdbc.setProperty("user",usuario);
+                jdbc.setProperty("password",password);
+                jdbc.setProperty("connectTimeout","10");
+                jdbc.setProperty("socketTimeout","20");
+                DriverManager.setLoginTimeout(10);
+                conexion = DriverManager.getConnection(url,jdbc);
             }
-        } catch (ClassNotFoundException e) {
-            System.err.println("Error: Driver de PostgreSQL no encontrado: " + e.getMessage());
-        } catch (SQLException e) {
-            System.err.println("Error al conectar a la base de datos: " + e.getMessage());
-        }
-        return conexion;
+            return conexion;
+        } catch (SQLException e) { throw ErrorDatos.desde(e); }
     }
 
-    // Cierra la conexion si esta abierta
-    public static void cerrarConexion() {
-        try {
-            if (conexion != null && !conexion.isClosed()) {
-                conexion.close();
-                System.out.println("Conexion cerrada correctamente.");
-            }
-        } catch (SQLException e) {
-            System.err.println("Error al cerrar la conexion: " + e.getMessage());
-        }
+    public static synchronized void cerrarConexion() {
+        try { if (conexion != null) conexion.close(); }
+        catch (SQLException e) { throw ErrorDatos.desde(e); }
+        finally { conexion = null; }
     }
 
     public static void main(String[] args) {
-        Connection conn = ConexionBD.getConexion();
-        if (conn != null) {
-            System.out.println("Prueba de conexion exitosa.");
-            ConexionBD.cerrarConexion();
-        } else {
-            System.out.println("No se pudo conectar. Revisa config.properties.");
-        }
+        try { getConexion(); System.out.println("Prueba de conexion exitosa."); }
+        catch (ErrorDatos e) { System.err.println(e.getMessage()); System.exit(1); }
+        finally { cerrarConexion(); }
     }
 }

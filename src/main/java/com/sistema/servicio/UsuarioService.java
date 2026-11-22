@@ -10,7 +10,7 @@ import com.sistema.modelo.DocenteDAO;
 
 import java.util.List;
 
-// Servicio para validar usuarios, roles y encriptar contrasenas con SHA-512
+// Valida cuentas y asociaciones; protege nuevas contrasenas con PBKDF2.
 public class UsuarioService {
 
     private final UsuarioDAO usuarioDAO;
@@ -49,6 +49,7 @@ public class UsuarioService {
 
     public boolean registrarUsuario(Usuario usuario) {
         validarUsuario(usuario);
+        if (usuario.getPassword().length()<8) throw new IllegalArgumentException("La contrasena debe tener al menos 8 caracteres.");
         String usernameLimpio = usuario.getUsername().trim();
         usuario.setUsername(usernameLimpio);
         usuario.setRol(usuario.getRol().trim().toUpperCase());
@@ -58,10 +59,7 @@ public class UsuarioService {
             throw new IllegalArgumentException("Ya existe un usuario con ese nombre.");
         }
 
-        if (!SeguridadUtil.esHashValido(usuario.getPassword())) {
-            usuario.setPassword(SeguridadUtil.hashSHA512(usuario.getPassword()));
-        }
-
+        usuario.setPassword(SeguridadUtil.hashPassword(usuario.getPassword()));
         return usuarioDAO.insertar(usuario);
     }
 
@@ -88,8 +86,12 @@ public class UsuarioService {
         if (existente != null && existente.getIdUsuario() != usuario.getIdUsuario()) {
             throw new IllegalArgumentException("Ya existe un usuario con ese nombre.");
         }
-        if (!SeguridadUtil.esHashValido(usuario.getPassword())) {
-            usuario.setPassword(SeguridadUtil.hashSHA512(usuario.getPassword()));
+        Usuario guardado = usuarioDAO.buscarPorId(usuario.getIdUsuario());
+        boolean conservaClave = guardado != null && usuario.getPassword().equals(guardado.getPassword())
+                && SeguridadUtil.esHashValido(guardado.getPassword());
+        if (!conservaClave) {
+            if (usuario.getPassword().length() < 8) throw new IllegalArgumentException("La contrasena debe tener al menos 8 caracteres.");
+            usuario.setPassword(SeguridadUtil.hashPassword(usuario.getPassword()));
         }
 
         return usuarioDAO.actualizar(usuario);
@@ -115,7 +117,8 @@ public class UsuarioService {
         if (usuario.getRol() == null) {
             throw new IllegalArgumentException("El rol es obligatorio.");
         }
-        String rol = usuario.getRol().trim().toUpperCase();
+        usuario.setUsername(Validaciones.texto(usuario.getUsername(),"El usuario",50));
+        String rol = usuario.getRol().trim().toUpperCase(java.util.Locale.ROOT);
         if (!rol.equals("ADMIN") && !rol.equals("DOCENTE") && !rol.equals("ESTUDIANTE")) {
             throw new IllegalArgumentException("El rol debe ser ADMIN, DOCENTE o ESTUDIANTE.");
         }

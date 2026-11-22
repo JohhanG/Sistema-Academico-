@@ -29,8 +29,9 @@ public class ConsultaNotasView extends JFrame implements ActionListener {
 
     private final Usuario usuarioActual;
     private final JFrame menuPrincipal;
-    private final EstudianteDao estudianteDao;
-    private final InscripcionCursoService inscripcionService;
+    private final com.sistema.servicio.BoletinService boletinService;
+    private List<com.sistema.servicio.BoletinService.Boletin> boletines = java.util.Collections.emptyList();
+
 
     private JPanel panelSelectorAdmin;
     private JComboBox<String> cmbEstudiantes;
@@ -51,8 +52,8 @@ public class ConsultaNotasView extends JFrame implements ActionListener {
     public ConsultaNotasView(Usuario usuarioActual, JFrame menuPrincipal) {
         this.usuarioActual = usuarioActual;
         this.menuPrincipal = menuPrincipal;
-        this.estudianteDao = new EstudianteDao();
-        this.inscripcionService = new InscripcionCursoService();
+        this.boletinService = new com.sistema.servicio.BoletinService();
+
 
         initComponents();
         cargarDatosSegunRol();
@@ -253,81 +254,44 @@ public class ConsultaNotasView extends JFrame implements ActionListener {
     }
 
     private void cargarDatosSegunRol() {
-        String rol = usuarioActual != null && usuarioActual.getRol() != null
-                ? usuarioActual.getRol().toUpperCase()
-                : "ESTUDIANTE";
-
-        cmbEstudiantes.removeAllItems();
-        modeloTabla.setRowCount(0);
-        lblValIdentificacion.setText("");
-        lblValNombre.setText("Sin datos disponibles");
-        lblValCorreo.setText("");
-        lblValCreditos.setText("0");
-        lblValPromedio.setText("Sin calificar");
-
-        if (rol.equals("ESTUDIANTE")) {
-            panelSelectorAdmin.setVisible(false);
-            try {
-                Estudiante est = new com.sistema.servicio.IdentidadAcademicaService(estudianteDao)
-                        .exigirEstudiante(usuarioActual);
-                mostrarBoletinDeEstudiante(est);
-            } catch (IllegalArgumentException e) {
-                modeloTabla.setRowCount(0);
-                lblValNombre.setText("Sin estudiante asociado");
-                lblValPromedio.setText("Sin datos");
-                lblValCorreo.setText("");
-                lblValIdentificacion.setText("");
-                javax.swing.JOptionPane.showMessageDialog(this, e.getMessage(),
-                        "Cuenta sin vinculo valido", javax.swing.JOptionPane.WARNING_MESSAGE);
+        TrabajoUI.ejecutar(this, () -> boletinService.cargar(usuarioActual), datos -> {
+            boletines=datos;
+            cmbEstudiantes.removeAllItems();
+            modeloTabla.setRowCount(0);
+            lblValIdentificacion.setText(""); lblValNombre.setText("Sin datos disponibles");
+            lblValCorreo.setText(""); lblValCreditos.setText("0"); lblValPromedio.setText("Sin calificar");
+            panelSelectorAdmin.setVisible(!"ESTUDIANTE".equalsIgnoreCase(usuarioActual.getRol()));
+            for (var b:datos) {
+                Estudiante e=b.estudiante();
+                cmbEstudiantes.addItem(e.getIdEstudiante()+" - "+e.getNombre()+" "+e.getApellido());
             }
-        } else {
-            List<Estudiante> todos;
-            if (rol.equals("DOCENTE")) {
-                try {
-                    java.util.Set<Integer> ids = new java.util.LinkedHashSet<>();
-                    for (InscripcionCurso i : inscripcionService.listarParaUsuario(usuarioActual)) {
-                        ids.add(i.getIdEstudiante());
-                    }
-                    todos = new java.util.ArrayList<>();
-                    for (int id : ids) estudianteDao.buscarPorId(id).ifPresent(todos::add);
-                } catch (IllegalArgumentException e) {
-                    javax.swing.JOptionPane.showMessageDialog(this, e.getMessage());
-                    todos = java.util.Collections.emptyList();
-                }
-            } else if (rol.equals("ADMIN")) {
-                todos = estudianteDao.obtenerTodos();
-            } else {
-                todos = java.util.Collections.emptyList();
-            }
-            for (Estudiante e : todos) {
-                cmbEstudiantes.addItem(e.getIdEstudiante() + " - " + e.getNombre() + " " + e.getApellido());
-            }
-            panelSelectorAdmin.setVisible(true);
-            if (!todos.isEmpty()) {
-                mostrarBoletinDeEstudiante(todos.get(0));
-            }
-        }
+            if (!datos.isEmpty()) mostrarBoletinDeEstudiante(datos.get(0));
+        }, mensaje -> {
+            boletines=java.util.Collections.emptyList(); cmbEstudiantes.removeAllItems(); modeloTabla.setRowCount(0);
+            lblValNombre.setText("No se pudieron cargar los datos"); lblValCorreo.setText("");
+            lblValIdentificacion.setText(""); lblValCreditos.setText("0"); lblValPromedio.setText("Sin datos");
+            JOptionPane.showMessageDialog(this,mensaje,"Consulta no disponible",JOptionPane.WARNING_MESSAGE);
+        });
     }
 
-    private void mostrarBoletinDeEstudiante(Estudiante est) {
+    private void mostrarBoletinDeEstudiante(com.sistema.servicio.BoletinService.Boletin boletin) {
+        Estudiante est=boletin.estudiante();
         lblValIdentificacion.setText("EST-" + String.format("%04d", est.getIdEstudiante()));
         lblValNombre.setText((est.getNombre() + " " + est.getApellido()).toUpperCase());
         lblValCorreo.setText(est.getEmail());
 
         modeloTabla.setRowCount(0);
-        List<InscripcionCurso> materias = inscripcionService.listarParaUsuario(usuarioActual).stream()
-                .filter(i -> i.getIdEstudiante() == est.getIdEstudiante())
-                .collect(java.util.stream.Collectors.toList());
+        List<InscripcionCurso> materias = boletin.materias();
 
         int totalCreditos = 0;
         double sumaNotas = 0.0;
         int materiasCalificadas = 0;
 
         for (InscripcionCurso insc : materias) {
-            totalCreditos += insc.getCreditos();
+            if (!"Cancelado".equals(insc.getEstado())) totalCreditos += insc.getCreditos();
             String codigoCurso = String.format("MAT-%03d", insc.getIdGrupo());
             String notaTexto = "-";
-            if (insc.getNotaFinal() != null) {
+            if (insc.getNotaFinal() != null && !"Cancelado".equals(insc.getEstado())) {
                 notaTexto = String.valueOf(insc.getNotaFinal());
                 sumaNotas += insc.getNotaFinal();
                 materiasCalificadas++;
@@ -356,14 +320,8 @@ public class ConsultaNotasView extends JFrame implements ActionListener {
     }
 
     private void consultarSeleccionadoEnCombo() {
-        String item = (String) cmbEstudiantes.getSelectedItem();
-        if (item == null) return;
-        String[] partes = item.split(" - ");
-        int idEst = Integer.parseInt(partes[0].trim());
-        Optional<Estudiante> opt = estudianteDao.buscarPorId(idEst);
-        if (opt.isPresent()) {
-            mostrarBoletinDeEstudiante(opt.get());
-        }
+        int indice=cmbEstudiantes.getSelectedIndex();
+        if (indice>=0 && indice<boletines.size()) mostrarBoletinDeEstudiante(boletines.get(indice));
     }
 
     private void volverAlMenu() {
@@ -375,6 +333,7 @@ public class ConsultaNotasView extends JFrame implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (TrabajoUI.ocupado(this)) return;
         Object source = e.getSource();
         if (source == btnRefrescar) {
             cargarDatosSegunRol();

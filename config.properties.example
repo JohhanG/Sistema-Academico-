@@ -1,0 +1,5 @@
+# Copiar como config.local.properties. No publicar credenciales reales.
+URL=jdbc:postgresql://localhost:5432/sistema_academico?connectTimeout=10&socketTimeout=20
+USER=postgres
+PASSWORD=
+# Para Supabase utiliza el host y usuario de Session pooler y agrega sslmode=require.

@@ -10,10 +10,16 @@ import java.util.UUID;
 /** Conexion aislada para pruebas. Nunca lee las credenciales de config.properties. */
 public final class BaseAcademicaTemporal implements AutoCloseable {
     private final Field campo;
+    private final Field modoUI;
+    private final boolean modoAnterior;
     private final Connection anterior;
     public final Connection conexion;
 
     public BaseAcademicaTemporal() throws Exception {
+        modoUI=com.sistema.vista.TrabajoUI.class.getDeclaredField("sincronoParaPruebas");
+        modoUI.setAccessible(true);
+        modoAnterior=modoUI.getBoolean(null);
+        modoUI.setBoolean(null,true);
         conexion = DriverManager.getConnection("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=PostgreSQL", "sa", "");
         campo = ConexionBD.class.getDeclaredField("conexion");
         campo.setAccessible(true);
@@ -36,6 +42,7 @@ public final class BaseAcademicaTemporal implements AutoCloseable {
 
     @Override public void close() throws Exception {
         campo.set(null, anterior);
+        modoUI.setBoolean(null,modoAnterior);
         conexion.close();
     }
 }

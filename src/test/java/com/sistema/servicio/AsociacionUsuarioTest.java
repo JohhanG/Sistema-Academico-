@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AsociacionUsuarioTest {
     private final UsuarioDAO cuentas = new UsuarioDAO() {
+        @Override public Usuario buscarPorId(int id) { return null; }
         @Override public Usuario buscarPorUsername(String username) { return null; }
         @Override public boolean insertar(Usuario u) { return true; }
         @Override public boolean actualizar(Usuario u) { return true; }
